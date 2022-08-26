@@ -5,23 +5,29 @@
 #include <iostream>
 using namespace std;
 
-constexpr uint32_t _1MB = 1<<20;
-constexpr uint32_t _64MB = 1<<26;
-
+#define DEBUG
+#ifdef DEBUG
+#define LOG(frm, argc...) {\
+    printf("[%s : %d] ", __func__, __LINE__);\
+    printf(frm, ##argc);\
+    printf("\n");\
+}
+#else
+#define LOG(frm, argc...)
+#endif
 
 TEST_CASE("cache test") {
-    ShardedLRUCache* cache = NewLRUCache(_64MB);
-
+    ShardedLRUCache* cache = NewLRUCache(1<<20);
+    Slice k{"abc"}, v{"def"};
     for(int i=0; i<10; ++i) {
-        Slice k{"abc"}, v{"def"};
-        cache->Insert(k,&v,1,nullptr);
+        
+        cache->Insert(k,&v,nullptr);
     }
-    cout<<cache->TotalCharge();
-    Slice k{"abc"};
+    CHECK(cache->TotalCharge() == 1);
+
     auto res = cache->Lookup(k);
-    if(res) {
-        auto t = reinterpret_cast<Slice*>(res->value);
-        CHECK(t->ToString() == "def");
-    }
+    REQUIRE(res != nullptr);
+    auto t = reinterpret_cast<Slice*>(res->value);
+    CHECK(t->ToString() == "def");
 }
 

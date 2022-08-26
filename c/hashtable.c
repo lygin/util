@@ -43,7 +43,7 @@
 #include <ctype.h>
 #include <assert.h>
 
-#include "hash.h"
+#include "hashtable.h"
 
 
 /* Using dictEnableResize() / dictDisableResize() we make possible to
