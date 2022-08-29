@@ -3,31 +3,49 @@
 
 #include "cache.h"
 #include <iostream>
+#include <memory>
 using namespace std;
 
-#define DEBUG
-#ifdef DEBUG
-#define LOG(frm, argc...) {\
-    printf("[%s : %d] ", __func__, __LINE__);\
-    printf(frm, ##argc);\
-    printf("\n");\
+class XX{
+    public:
+    ~XX() {
+        LOG("XX is deleted");
+    }
+};
+struct VAL{
+    string x;
+    XX a;
+};
+
+void DeleteVAL(const Slice& k, void *v) {
+    auto val = reinterpret_cast<VAL*>(v);
+    delete val;
+    LOG("release %s", k.data());
 }
-#else
-#define LOG(frm, argc...)
-#endif
 
 TEST_CASE("cache test") {
-    ShardedLRUCache* cache = NewLRUCache(1<<20);
-    Slice k{"abc"}, v{"def"};
+    shared_ptr<ShardedLRUCache> cache = make_shared<ShardedLRUCache>(1<<20);
+    
     for(int i=0; i<10; ++i) {
-        
-        cache->Insert(k,&v,nullptr);
+        string k = "abc" + to_string(i);
+        auto v = new VAL;
+        v->x = "iam" + to_string(i);
+        auto e = cache->Insert(k,v,DeleteVAL);
+        //插入之后也算e在使用，不用e的时候需要release
+        cache->Release(e);
     }
-    CHECK(cache->TotalCharge() == 1);
+    CHECK(cache->TotalCharge() == 10);
 
+    string k = "abc0";
     auto res = cache->Lookup(k);
+    //不能在此release，因为如果release后，并发情况下res被淘汰，那么res->val就有问题
+    //应该不读写res的时候，release
     REQUIRE(res != nullptr);
-    auto t = reinterpret_cast<Slice*>(res->value);
-    CHECK(t->ToString() == "def");
+    auto t = reinterpret_cast<VAL*>(res->value);
+    CHECK(t->x == "iam0");
+    cache->Release(res);
+    k = "abc11";
+    res = cache->Lookup(k);;
+    REQUIRE(res == nullptr);
 }
 

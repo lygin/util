@@ -22,3 +22,12 @@ public:
 private:
     std::chrono::steady_clock::time_point tp_;
 };
+
+typedef unsigned long long ticks;
+static __inline__ ticks getticks(void)
+{
+    uint32_t a, d;
+
+    asm volatile("rdtsc" : "=a" (a), "=d" (d));
+    return (((ticks)a) | (((ticks)d) << 32));
+}

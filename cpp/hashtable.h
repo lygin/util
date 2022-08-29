@@ -287,6 +287,6 @@ private:
 };
 
 
-#endif
+#endif /* __cplusplus */
 
 #endif /* __DICT_H */

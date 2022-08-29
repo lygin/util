@@ -1,5 +1,9 @@
 #include "arena.h"
-
+/**
+ * @brief 线程不安全
+ * thread local Arena
+ * 不支持free(delete)，Arena析构时回收内存
+ */
 
 static const int kBlockSize = 4096;
 

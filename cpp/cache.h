@@ -7,6 +7,16 @@
 #include "slice.h"
 #include "murmur2.h"
 
+#define DEBUG
+#ifdef DEBUG
+#define LOG(frm, argc...) {\
+    printf("[%s : %d] ", __func__, __LINE__);\
+    printf(frm, ##argc);\
+    printf("\n");\
+}
+#else
+#define LOG(frm, argc...)
+#endif
 //一个Entry是一个堆分配的struct
 struct LRUEntry {
   void* value; //节点中保存的值
@@ -32,22 +42,27 @@ struct LRUEntry {
 class HashTable {
  public:
   HashTable() : length_(0), elems_(0), list_(nullptr) { Resize(); }
+  //直接用HashTable的话，要手动释放LRUEntry里
   ~HashTable() { delete[] list_; }
 
+  //找到key的话，返回slot（指向entry的指针）
+  //没找到返回null
   LRUEntry* Lookup(const Slice& key, uint32_t hash) {
     return *FindPointer(key, hash);
   }
-
+  //返回旧值，如果为null，则旧值不存在
   LRUEntry* Insert(LRUEntry* h) {
     LRUEntry** ptr = FindPointer(h->key(), h->hash);
     LRUEntry* old = *ptr;
+    //如果old == null，说明是新添加的key
+    //如果old不为null，则把old的next_hash付给h的next_hash
+    //TODO：没有释放old？需要应用释放
     h->next_hash = (old == nullptr ? nullptr : old->next_hash);
+    //ptr为指向slot的指针，把slot修改为新添加的h
     *ptr = h;
     if (old == nullptr) {
       ++elems_;
       if (elems_ > length_) {
-        // Since each cache entry is fairly large, we aim for a small
-        // average linked list length (<= 1).
         Resize();
       }
     }
@@ -58,6 +73,8 @@ class HashTable {
     LRUEntry** ptr = FindPointer(key, hash);
     LRUEntry* result = *ptr;
     if (result != nullptr) {
+      //ptr为指向slot的指针，把这个slot换成下一个slot
+      //TODO：没有释放？需要应用释放
       *ptr = result->next_hash;
       --elems_;
     }
@@ -69,13 +86,12 @@ class HashTable {
  private:
   // The table consists of an array of buckets where each bucket is
   // a linked list of cache entries that hash into the bucket.
+  LRUEntry** list_; //hashtable
   uint32_t length_; //capacity
   uint32_t elems_; //size
-  LRUEntry** list_; //Handle* 数组首地址
 
-  // Return a pointer to slot that points to a cache entry that
-  // matches key/hash.  If there is no such cache entry, return a
-  // pointer to the trailing slot in the corresponding linked list.
+  //返回指向符合key的slot的指针（slot里的指针会指向entry）
+  //如果找不到，返回指向null的指针
   LRUEntry** FindPointer(const Slice& key, uint32_t hash) {
     LRUEntry** ptr = &list_[hash & (length_ - 1)];
     while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key())) {
@@ -86,14 +102,17 @@ class HashTable {
 
   void Resize() {
     uint32_t new_length = 4;
+    //new_length为首个大于elem的2的整数次幂
     while (new_length < elems_) {
-      new_length *= 2;
+      new_length <<= 1;
     }
     LRUEntry** new_list = new LRUEntry*[new_length];
-    memset(new_list, 0, sizeof(new_list[0]) * new_length);
+    memset(new_list, 0, sizeof(LRUEntry*) * new_length);
     uint32_t count = 0;
+    //一次迁移完
     for (uint32_t i = 0; i < length_; i++) {
       LRUEntry* h = list_[i];
+      //迁移这个bucket
       while (h != nullptr) {
         LRUEntry* next = h->next_hash;
         uint32_t hash = h->hash;
@@ -120,8 +139,7 @@ class LRUCache {
   void SetCapacity(size_t capacity) { capacity_ = capacity; }
 
   // Like Cache methods, but with an extra "hash" parameter.
-  LRUEntry* Insert(const Slice& key, uint32_t hash, void* value,
-                        void (*deleter)(const Slice& key, void* value));
+  LRUEntry* Insert(const Slice& key, uint32_t hash, void* value, void (*deleter)(const Slice& key, void* value));
   LRUEntry* Lookup(const Slice& key, uint32_t hash);
   void Release(LRUEntry* handle); //在哈希表中释放节点引用
   void Erase(const Slice& key, uint32_t hash); //在哈希表中删除节点
@@ -138,7 +156,6 @@ class LRUCache {
   void Unref(LRUEntry* e);
   bool FinishErase(LRUEntry* e);
 
-  // Initialized before use.
   size_t capacity_;
 
   // mutex_ protects the following state.
@@ -146,15 +163,10 @@ class LRUCache {
   size_t usage_;
   // GUARDED_BY可以在编译时期检查对变量操作是否加锁，clang++ -Wthread-safety
 
-  // Dummy head of LRU list.
-  // lru.prev is newest entry, lru.next is oldest entry.
+  //被客户端引用的 in-use 链表，和不被任何客户端引用的 lru_ 链表。
   // Entries have refs==1 and in_cache==true.
-  // 可以进行淘汰的节点
   LRUEntry lru_;
-
-  // Dummy head of in-use list.
   // Entries are in use by clients, and have refs >= 2 and in_cache==true.
-  // 不可淘汰的节点（正在使用？）
   LRUEntry in_use_;
 
   HashTable table_;
@@ -169,12 +181,12 @@ LRUCache::LRUCache() : capacity_(0), usage_(0) {
 }
 
 LRUCache::~LRUCache() {
-  assert(in_use_.next == &in_use_);  // Error if caller has an unreleased handle
+  assert(in_use_.next == &in_use_);  // 应该没有客户端正在使用
   for (LRUEntry* e = lru_.next; e != &lru_;) {
     LRUEntry* next = e->next;
     assert(e->in_cache);
     e->in_cache = false;
-    assert(e->refs == 1);  // Invariant of lru_ list.
+    assert(e->refs == 1);  // lru_ list非法
     Unref(e);
     e = next;
   }
@@ -194,7 +206,7 @@ void LRUCache::Unref(LRUEntry* e) {
   if (e->refs == 0) {  // Deallocate.
     assert(!e->in_cache);
     //blockcache则需要将该block(e->value)写到RMDA远端
-    (*e->deleter)(e->key(), e->value);
+    if(e->deleter) (*e->deleter)(e->key(), e->value);
     free(e);
   } else if (e->in_cache && e->refs == 1) {
     // No longer in use; move to lru_ list.
@@ -230,26 +242,28 @@ void LRUCache::Release(LRUEntry* handle) {
   Unref(reinterpret_cast<LRUEntry*>(handle));
 }
 
-LRUEntry* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
-                                void (*deleter)(const Slice& key,
-                                                void* value)) {
+//把 Cache 的引用也算一个引用。因此在 Insert 时，会令 refs = 2，一个为客户端的引用，一个为 LRUCache 的引用。
+//refs==1 && in_cache即说明该数据条目只被 LRUCache 引用了。
+//ref==0说明不在缓存中了
+//返回：插入的e
+LRUEntry* LRUCache::Insert(const Slice& key, uint32_t hash, void* value, void (*deleter)(const Slice& key, void* value)) {
   std::lock_guard<std::mutex> l(mutex_);
 
-  LRUEntry* e =
-      reinterpret_cast<LRUEntry*>(malloc(sizeof(LRUEntry) - 1 + key.size()));
+  LRUEntry* e = reinterpret_cast<LRUEntry*>(malloc(sizeof(LRUEntry) - 1 + key.size()));
   e->value = value;
   e->deleter = deleter;
   e->key_length = key.size();
   e->hash = hash;
   e->in_cache = false;
-  e->refs = 1;  // for the returned handle.
+  e->refs = 1;  // 客户端引用
   std::memcpy(e->key_data, key.data(), key.size());
 
   if (capacity_ > 0) {
-    e->refs++;  // for the cache's reference.
+    e->refs++;  // cache引用
     e->in_cache = true;
     LRU_Append(&in_use_, e);
     usage_ ++;
+    //如果是替换，删除旧值
     FinishErase(table_.Insert(e));
   } else {  // don't cache. (capacity_==0 is supported and turns off caching.)
     // next is read by key() in an assert, so it must be initialized
@@ -267,8 +281,7 @@ LRUEntry* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   return e;
 }
 
-// If e != nullptr, finish removing *e from the cache; it has already been
-// removed from the hash table.  Return whether e != nullptr.
+ // 辅助函数：从缓存中删除单个链节 e，直接删除（最好先把e的客户端引用变为0再删）
 bool LRUCache::FinishErase(LRUEntry* e) {
   if (e != nullptr) {
     assert(e->in_cache);
@@ -284,7 +297,7 @@ void LRUCache::Erase(const Slice& key, uint32_t hash) {
   std::lock_guard<std::mutex> l(mutex_);
   FinishErase(table_.Remove(key, hash));
 }
-
+// 驱逐全部没有被使用的数据条目
 void LRUCache::Prune() {
   std::lock_guard<std::mutex> l(mutex_);
   while (lru_.next != &lru_) {
@@ -357,5 +370,3 @@ class ShardedLRUCache {
     return total;
   }
 };
-
-ShardedLRUCache* NewLRUCache(size_t capacity) { return new ShardedLRUCache(capacity); }
