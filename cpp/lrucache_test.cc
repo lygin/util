@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-#include "cache.h"
+#include "lrucache.h"
 #include <iostream>
 #include <memory>
 using namespace std;
@@ -17,24 +17,23 @@ struct VAL{
     XX a;
 };
 
-void DeleteVAL(const Slice& k, void *v) {
+void DeleteVAL(void *v) {
     auto val = reinterpret_cast<VAL*>(v);
     delete val;
-    LOG("release %s", k.data());
 }
 
 TEST_CASE("cache test") {
-    shared_ptr<ShardedLRUCache> cache = make_shared<ShardedLRUCache>(1<<20);
+    shared_ptr<ShardedLRUCache> cache = make_shared<ShardedLRUCache>(1<<20, DeleteVAL);
     
     for(int i=0; i<10; ++i) {
         string k = "abc" + to_string(i);
         auto v = new VAL;
         v->x = "iam" + to_string(i);
-        auto e = cache->Insert(k,v,DeleteVAL);
+        auto e = cache->Insert(k,v);
         //插入之后也算e在使用，不用e的时候需要release
         cache->Release(e);
     }
-    CHECK(cache->TotalCharge() == 10);
+    CHECK(cache->TotalElem() == 10);
 
     string k = "abc0";
     auto res = cache->Lookup(k);

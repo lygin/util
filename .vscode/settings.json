@@ -70,6 +70,7 @@
         "future": "cpp",
         "hash_map": "cpp",
         "hash_set": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "codecvt": "cpp"
     }
 }
