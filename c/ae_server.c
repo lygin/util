@@ -56,14 +56,15 @@ void writeFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask
     int n = (int)clientData;
     if((connfd = fd) < 0)
         return;
-    
+    LOG("write to client %s", buf);
     if((ret = write(connfd , buf , n)) != n)	
     {
         printf("error writing to the sockfd!\n");
         return;
     }//if
-    /*设置用于读的文件描述符和事件（原来读了没删不用设）*/
-    //aeCreateFileEvent(eventLoop, connfd, AE_READABLE, readFunc, NULL);
+    /*删除写事件，设置用于读的文件描述符和事件*/
+    aeDeleteFileEvent(eventLoop, connfd, AE_WRITABLE);
+    aeCreateFileEvent(eventLoop, connfd, AE_READABLE, readFunc, NULL);
 }
 
 void readFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask) {
@@ -81,7 +82,8 @@ void readFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask)
     } else {
         buf[n] = '\0';
         printf("client send message: %s\n", buf);
-        /*设置用于注册写操作文件描述符和事件*/
+        /*删除读事件，设置用于注册写操作文件描述符和事件*/
+        aeDeleteFileEvent(eventLoop, connfd, AE_READABLE);
         aeCreateFileEvent(eventLoop, connfd, AE_WRITABLE, writeFunc, n);	
     }
 }

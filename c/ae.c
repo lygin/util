@@ -236,6 +236,16 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
     aeApiDelEvent(eventLoop, fd, mask);
 }
 
+/*
+ * 获取给定 fd 正在监听的事件类型
+ */
+int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
+    if (fd >= eventLoop->setsize) return 0;
+    aeFileEvent *fe = &eventLoop->events[fd];
+
+    return fe->mask;
+}
+
 /* 
  * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
 
@@ -299,7 +309,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
            /* note the fe->mask & mask & ... code: maybe an already processed
              * event removed an element that fired and we still didn't
              * processed, so we check if the event is still valid. */
-            // 读事件
+            // 先读后写
             if (fe->mask & mask & AE_READABLE) {
                 // rfired 确保读/写事件只能执行其中一个
                 rfired = 1;
