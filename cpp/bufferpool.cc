@@ -42,7 +42,6 @@ LRUEntry *BufferPoolManager::FetchPage(page_id_t page_id)
     //1.2 pool没有空位置，new后插入cache，因为这样会让pool膨胀，占用空间变多
     //如果插入的cache正好满了，会淘汰掉一个Page，这个Page会放入free_list
     //最终结果就是free_list不断变大
-    //但是有个问题就是 现在new的page，由于没有在pages[]中，所以会无法释放
     //TODO：free_list满后，调用淘汰接口，淘汰一个LRUentry，放到free_list
     if(pg == nullptr) {
         pg = (Page*)arena_.AllocateAligned(sizeof(Page));
@@ -73,7 +72,7 @@ bool BufferPoolManager::FlushPage(Page* pg)
     }
     return false;
 }
-//删除内存Page，但不会删除影响Page
+//删除内存Page，但不会删除影响磁盘Page
 bool BufferPoolManager::DeletePage(page_id_t page_id)
 {
     cache_->Erase(Slice((char*)&page_id, 4));

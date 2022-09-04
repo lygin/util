@@ -71,6 +71,9 @@
         "hash_map": "cpp",
         "hash_set": "cpp",
         "*.inc": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "ae.h": "c",
+        "epoll.h": "c",
+        "stdio.h": "c"
     }
 }

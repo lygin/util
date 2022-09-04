@@ -9,9 +9,7 @@
 #include "lrucache.h"
 #include "arena.h"
 
-/**
- * BufferPoolManager reads disk pages to and from its internal buffer pool.
- */
+// TODO：Arena并发控制
 class BufferPoolManager
 {
 public:
