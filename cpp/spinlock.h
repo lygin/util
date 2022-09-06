@@ -8,12 +8,12 @@ using namespace std;
  * 不能阻塞wait, 只能快速加解锁, 适用于锁粒度非常小的情况, 减小线程切换的开销
  * 不支持trylock
  */
-class TC_SpinLock
+class SpinLock
 {
 public:
 
-	TC_SpinLock();
-	virtual ~TC_SpinLock();
+	SpinLock();
+	virtual ~SpinLock();
 
 	void lock() const;
     bool tryLock() const;
@@ -21,10 +21,10 @@ public:
 
 private:
 
-	TC_SpinLock(const TC_SpinLock&) = delete;
-	TC_SpinLock(TC_SpinLock&&) = delete;
-	TC_SpinLock& operator=(const TC_SpinLock&) = delete;
-	TC_SpinLock& operator=(TC_SpinLock&&) = delete;
+	SpinLock(const SpinLock&) = delete;
+	SpinLock(SpinLock&&) = delete;
+	SpinLock& operator=(const SpinLock&) = delete;
+	SpinLock& operator=(SpinLock&&) = delete;
 
 private:
 

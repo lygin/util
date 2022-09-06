@@ -15,7 +15,7 @@ using namespace std;
  * @file tc_thread_pool.h
  * @brief 线程池类,采用c++11来实现了
  * 使用说明:
- * TC_ThreadPool tpool;
+ * ThreadPool tpool;
  * tpool.init(5);   //初始化线程池线程数
  * //启动线程有两种方式
  * //第一种, 直接启动
@@ -36,7 +36,7 @@ using namespace std;
  * //此时: 外部需要结束线程池是调用
  * tpool.stop();
  * 注意:
- * TC_ThreadPool::exec执行任务返回的是个future, 因此可以通过future异步获取结果, 比如:
+ * ThreadPool::exec执行任务返回的是个future, 因此可以通过future异步获取结果, 比如:
  * int testInt(int i)
  * {
  *     return i;
@@ -55,7 +55,7 @@ using namespace std;
  * cout << f.get() << endl;
  * @author  jarodruan@upchina.com
  */
-class TC_ThreadPool
+class ThreadPool
 {
 protected:
     struct TaskFunc
@@ -68,8 +68,8 @@ protected:
     };
     typedef shared_ptr<TaskFunc> TaskFuncPtr;
 public:
-    TC_ThreadPool();
-    virtual ~TC_ThreadPool();
+    ThreadPool();
+    virtual ~ThreadPool();
 
     /**
     * @brief 初始化.
@@ -189,14 +189,14 @@ protected:
     std::atomic<int>          _atomic{ 0 };
 };
 
-class TC_ThreadPoolHash
+class ThreadPoolHash
 {
 public:
-    TC_ThreadPoolHash();
-    virtual ~TC_ThreadPoolHash();
+    ThreadPoolHash();
+    virtual ~ThreadPoolHash();
 
-    TC_ThreadPoolHash(const TC_ThreadPoolHash&) = delete;
-    TC_ThreadPoolHash& operator = (const TC_ThreadPoolHash&) = delete;
+    ThreadPoolHash(const ThreadPoolHash&) = delete;
+    ThreadPoolHash& operator = (const ThreadPoolHash&) = delete;
 
     /**
     * @brief 初始化.
@@ -238,25 +238,25 @@ public:
     template <class F, class... Args>
     auto exec(const string& hashkey,int64_t timeoutMs, F&& f, Args&&... args)->std::future<decltype(f(args...))>
     {
-        TC_ThreadPool* thread = selectThread(hashkey);
+        ThreadPool* thread = selectThread(hashkey);
         if (thread)
         {
             return thread->exec(timeoutMs,f, args...);
         }
         else
         {
-            throw "[TC_ThreadPoolHash::start] no worker thread!";
+            throw "[ThreadPoolHash::start] no worker thread!";
         }
     }
     
-    TC_ThreadPool* getThread(size_t index);
+    ThreadPool* getThread(size_t index);
     size_t size() { return _pools.size(); }
 protected:
-    TC_ThreadPool* selectThread(const string& hashkey);
+    ThreadPool* selectThread(const string& hashkey);
 
 protected:
 private:
-    vector<TC_ThreadPool*> _pools;
+    vector<ThreadPool*> _pools;
 
 };
 

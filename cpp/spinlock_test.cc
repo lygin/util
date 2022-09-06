@@ -13,10 +13,10 @@ constexpr int N = 1'000'000;
 el::Logger* Logger = el::Loggers::getLogger("default");
 std::queue<int> q;
 std::mutex mtx;
-TC_SpinLock lk;
+SpinLock lk;
 
 TEST_CASE("spinlock") {
-    TC_ThreadPool tp;
+    ThreadPool tp;
     tp.init(16);
     tp.start();
     Timer t;

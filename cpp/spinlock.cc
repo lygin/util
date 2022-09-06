@@ -8,16 +8,16 @@ using namespace std;
 #define TRYS_COUNT 10
 #define TRYS_SLEEP 1
 
-TC_SpinLock::TC_SpinLock()
+SpinLock::SpinLock()
 {
     _flag.clear(std::memory_order_release);
 }
 
-TC_SpinLock::~TC_SpinLock()
+SpinLock::~SpinLock()
 {
 }
 
-void TC_SpinLock::lock() const
+void SpinLock::lock() const
 {
     for (size_t i = 1; _flag.test_and_set(std::memory_order_acquire); i++)
     {
@@ -32,12 +32,12 @@ void TC_SpinLock::lock() const
     }
 }
 
-void TC_SpinLock::unlock() const
+void SpinLock::unlock() const
 {
     _flag.clear(std::memory_order_release);
 }
 
-bool TC_SpinLock::tryLock() const
+bool SpinLock::tryLock() const
 {
     int trys = TRYS_COUNT;
     for (; trys > 0 && _flag.test_and_set(std::memory_order_acquire); --trys)

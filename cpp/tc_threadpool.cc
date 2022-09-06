@@ -1,28 +1,28 @@
 #include "tc_threadpool.h"
 
-TC_ThreadPool::TC_ThreadPool()
+ThreadPool::ThreadPool()
     :  _threadNum(1), _bTerminate(true)
 {
 }
 
-TC_ThreadPool::~TC_ThreadPool()
+ThreadPool::~ThreadPool()
 {
     stop();
 }
 
-void TC_ThreadPool::init(size_t num)
+void ThreadPool::init(size_t num)
 {
     std::unique_lock<std::mutex> lock(_mutex);
 
     if (!_threads.empty())
     {
-        throw "[TC_ThreadPool::init] thread pool has start!";
+        throw "[ThreadPool::init] thread pool has start!";
     }
 
     _threadNum = num;
 }
 
-void TC_ThreadPool::stop()
+void ThreadPool::stop()
 {
     if(_bTerminate)
     {
@@ -51,24 +51,24 @@ void TC_ThreadPool::stop()
     _threads.clear();
 }
 
-void TC_ThreadPool::start()
+void ThreadPool::start()
 {
     std::unique_lock<std::mutex> lock(_mutex);
 
     if (!_threads.empty())
     {
-        throw "[TC_ThreadPool::start] thread pool has start!";
+        throw "[ThreadPool::start] thread pool has start!";
     }
 
     _bTerminate = false;
 
     for (size_t i = 0; i < _threadNum; i++)
     {
-        _threads.push_back(new thread(&TC_ThreadPool::run, this));
+        _threads.push_back(new thread(&ThreadPool::run, this));
     }
 }
 
-bool TC_ThreadPool::get(TaskFuncPtr& task)
+bool ThreadPool::get(TaskFuncPtr& task)
 {
     std::unique_lock<std::mutex> lock(_mutex);
 
@@ -92,7 +92,7 @@ bool TC_ThreadPool::get(TaskFuncPtr& task)
     return false;
 }
 
-void TC_ThreadPool::run()
+void ThreadPool::run()
 {
     //调用处理部分
     while (!isTerminate())
@@ -129,7 +129,7 @@ void TC_ThreadPool::run()
     }
 }
 
-bool TC_ThreadPool::waitForAllDone(int millsecond)
+bool ThreadPool::waitForAllDone(int millsecond)
 {
     std::unique_lock<std::mutex> lock(_mutex);
 
@@ -149,27 +149,27 @@ bool TC_ThreadPool::waitForAllDone(int millsecond)
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-TC_ThreadPoolHash::TC_ThreadPoolHash()
+ThreadPoolHash::ThreadPoolHash()
 {
 
 }
 
-TC_ThreadPoolHash::~TC_ThreadPoolHash()
+ThreadPoolHash::~ThreadPoolHash()
 {
 
 }
 
-void TC_ThreadPoolHash::init(size_t num)
+void ThreadPoolHash::init(size_t num)
 {
     for (size_t i = 0 ;i < num;i++)
     {
-        TC_ThreadPool* p = new TC_ThreadPool();
+        ThreadPool* p = new ThreadPool();
         p->init(1);
         _pools.push_back(p);
     }
 }
 
-TC_ThreadPool* TC_ThreadPoolHash::getThread(size_t index)
+ThreadPool* ThreadPoolHash::getThread(size_t index)
 {
     if (_pools.empty() || (index + 1) > _pools.size())
     {
@@ -178,7 +178,7 @@ TC_ThreadPool* TC_ThreadPoolHash::getThread(size_t index)
     return _pools[index];
 }
 
-TC_ThreadPool* TC_ThreadPoolHash::selectThread(const string& hashkey)
+ThreadPool* ThreadPoolHash::selectThread(const string& hashkey)
 {
     if (_pools.empty())
     {
@@ -189,7 +189,7 @@ TC_ThreadPool* TC_ThreadPoolHash::selectThread(const string& hashkey)
     return _pools[pos];
 }
 
-void TC_ThreadPoolHash::stop()
+void ThreadPoolHash::stop()
 {
     for (size_t i = 0; i < _pools.size(); i++)
     {
@@ -199,7 +199,7 @@ void TC_ThreadPoolHash::stop()
     _pools.clear();
 }
 
-void TC_ThreadPoolHash::start()
+void ThreadPoolHash::start()
 {
     for (size_t i = 0; i < _pools.size() ;i ++)
     {
