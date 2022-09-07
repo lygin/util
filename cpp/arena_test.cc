@@ -2,7 +2,7 @@
 #include "doctest.h"
 #include "arena.h"
 #include "timer.h"
-#include <mimalloc-2.0/mimalloc.h>
+//#include <mimalloc-2.0/mimalloc.h>
 
 using namespace std;
 
@@ -58,14 +58,14 @@ TEST_CASE("arena") {
     t2 = getticks();
     LOG("arena %llu %fs", t2-t1, t.GetDurationSec());
     //mimalloc
-    t.Reset();
-    t1 = getticks();
-    for(int i=0; i<times; ++i) {
-        void* x = mi_malloc_aligned(8, 8);
-        free(x);
-    }
-    t2 = getticks();
-    LOG("mimalloc %llu %fs", t2-t1, t.GetDurationSec());
+    // t.Reset();
+    // t1 = getticks();
+    // for(int i=0; i<times; ++i) {
+    //     void* x = mi_malloc_aligned(8, 8);
+    //     free(x);
+    // }
+    // t2 = getticks();
+    // LOG("mimalloc %llu %fs", t2-t1, t.GetDurationSec());
     //new
     t.Reset();
     t1 = getticks();
