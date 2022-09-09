@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-inline int min(int a, int b) {
+static int min(int a, int b) {
   return a < b ? a : b;
 }
 

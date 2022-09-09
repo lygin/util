@@ -5,14 +5,14 @@
 
 class Timer {
 public:
-    Timer(): tp_(std::chrono::steady_clock::now()) {}
+    Timer(): tp_(std::chrono::high_resolution_clock::now()) {}
     void Reset()
     {
-        tp_ = std::chrono::steady_clock::now();
+        tp_ = std::chrono::high_resolution_clock::now();
     }
     std::chrono::duration<double> GetDuration()
     {
-        return std::chrono::steady_clock::now() - tp_;
+        return std::chrono::high_resolution_clock::now() - tp_;
     }
     double GetDurationSec()
     {
@@ -20,7 +20,7 @@ public:
     }
 
 private:
-    std::chrono::steady_clock::time_point tp_;
+    std::chrono::high_resolution_clock::time_point tp_;
 };
 
 typedef unsigned long long ticks;

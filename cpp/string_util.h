@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <string>
+#include <vector>
 using namespace std;
 
 
@@ -144,6 +145,19 @@ inline string replace(const string &sString, const string &sSrc, const string &s
     }
 
     return sBuf;
+}
+
+inline std::vector<std::string> split(const std::string& str, const std::string& delimiter = " ")
+{
+    char* save = nullptr;
+    char* token = strtok_r(const_cast<char*>(str.c_str()), delimiter.c_str(), &save);
+    std::vector<std::string> result;
+    while (token != nullptr)
+    {
+        result.emplace_back(token);
+        token = strtok_r(nullptr, delimiter.c_str(), &save);
+    }
+    return result;
 }
 
 #endif

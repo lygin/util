@@ -1,8 +1,16 @@
+/**
+ * @file easylog_test.cc
+ * @brief 可以直接打印STL容器，Logger线程安全
+ * @version 0.1
+ * @date 2022-09-06
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "easylog.h"
 INITIALIZE_EASYLOGGINGPP
-
 
 TEST_CASE("easy log") {
     el::Configurations conf("/home/lj/base_compo/cpp/easylog.conf");

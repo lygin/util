@@ -26,12 +26,22 @@
  */
 // 文件事件
 #define AE_FILE_EVENTS 1
+// 时间事件
+#define AE_TIME_EVENTS 2
 // 所有事件
-#define AE_ALL_EVENTS (AE_FILE_EVENTS)
+#define AE_ALL_EVENTS (AE_FILE_EVENTS|AE_TIME_EVENTS)
 // 不阻塞，也不进行等待
 #define AE_DONT_WAIT 4
 
+/*
+ * 决定时间事件是否要持续执行的 flag
+ */
+#define AE_NOMORE -1
+
 typedef void aeFileProc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask);
+typedef int aeTimeProc(struct aeEventLoop *eventLoop, long long id, void *clientData);
+typedef void aeEventFinalizerProc(struct aeEventLoop *eventLoop, void *clientData);
+
 typedef struct aeFileEvent {
 
     // 监听事件类型掩码，
@@ -49,6 +59,33 @@ typedef struct aeFileEvent {
     void *clientData;
 
 } aeFileEvent;
+
+/* Time event structure
+ *
+ * 时间事件结构
+ */
+typedef struct aeTimeEvent {
+
+    // 时间事件的唯一标识符
+    long long id; /* time event identifier. */
+
+    // 事件的到达时间
+    long when_sec; /* seconds */
+    long when_ms; /* milliseconds */
+
+    // 事件处理函数
+    aeTimeProc *timeProc;
+
+    // 事件释放函数
+    aeEventFinalizerProc *finalizerProc;
+
+    // 多路复用库的私有数据
+    void *clientData;
+
+    // 指向下个时间事件结构，形成链表
+    struct aeTimeEvent *next;
+
+} aeTimeEvent;
 
 
 typedef struct aeFiredEvent {
@@ -81,6 +118,11 @@ typedef struct aeEventLoop {
     int stop;
     // 多路复用库的私有数据
     void *apidata; /* This is used for polling API specific data */
+
+    // 用于生成时间事件 id
+    long long timeEventNextId;
+    // 时间事件
+    aeTimeEvent *timeEventHead;
 } aeEventLoop;
 
 typedef struct aeApiState {
@@ -102,5 +144,11 @@ int aeGetFileEvents(aeEventLoop *eventLoop, int fd);
 int aeProcessEvents(aeEventLoop *eventLoop, int flags);
 void aeMain(aeEventLoop *eventLoop);
 void aeStop(aeEventLoop *eventLoop);
+
+//time event
+long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
+        aeTimeProc *proc, void *clientData,
+        aeEventFinalizerProc *finalizerProc);
+int aeDeleteTimeEvent(aeEventLoop *eventLoop, long long id);
 
 #endif
