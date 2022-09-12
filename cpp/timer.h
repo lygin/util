@@ -10,13 +10,20 @@ public:
     {
         tp_ = std::chrono::high_resolution_clock::now();
     }
-    std::chrono::duration<double> GetDuration()
-    {
-        return std::chrono::high_resolution_clock::now() - tp_;
-    }
     double GetDurationSec()
     {
-        return GetDuration().count();
+        auto tt = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::duration<double>>(tt-tp_).count();
+    }
+    double GetDurationMs()
+    {
+        auto tt = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(tt-tp_).count();
+    }
+    double GetDurationUs()
+    {
+        auto tt = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(tt-tp_).count();
     }
 
 private:

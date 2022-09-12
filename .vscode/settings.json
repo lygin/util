@@ -74,6 +74,7 @@
         "codecvt": "cpp",
         "ae.h": "c",
         "epoll.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "*.ipp": "cpp"
     }
 }
