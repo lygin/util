@@ -1,16 +1,12 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
-#include "easylog.h"
 #include "tc_threadpool.h"
 #include "timer.h"
 #include "spinlock.h"
 #include "common.h"
 #include <cstring>
 
-INITIALIZE_EASYLOGGINGPP
-
 constexpr int N = 1'000'000;
-el::Logger* Logger = el::Loggers::getLogger("default");
 std::queue<int> q;
 std::mutex mtx;
 SpinLock lk;
@@ -51,5 +47,4 @@ TEST_CASE("spinlock") {
     tp.waitForAllTaskDone();
     CHECK(q.size() == 0);
     double tsec = t.GetDurationSec();
-    Logger->info("totol time %v", tsec);
 }
