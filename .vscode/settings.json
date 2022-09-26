@@ -75,6 +75,9 @@
         "ae.h": "c",
         "epoll.h": "c",
         "stdio.h": "c",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "avxintrin.h": "c",
+        "immintrin.h": "c",
+        "emmintrin.h": "c"
     }
 }
