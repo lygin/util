@@ -78,6 +78,7 @@
         "*.ipp": "cpp",
         "avxintrin.h": "c",
         "immintrin.h": "c",
-        "emmintrin.h": "c"
+        "emmintrin.h": "c",
+        "regex": "cpp"
     }
 }

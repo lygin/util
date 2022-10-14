@@ -5,7 +5,7 @@
 #include <thread>
 
 using namespace std;
-const int N = 1<<20;
+const int N = 1<<25;
 int a[N];
 
 int main() {
