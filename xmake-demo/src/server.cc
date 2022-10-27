@@ -11,8 +11,13 @@
 #include <event2/util.h>
 #include <event2/event.h>
 
-static const char MESSAGE[] = "This is John Corner speaking\n";
+#include "a.pb.h"
+using namespace std;
+
 static const int PORT = 9995;
+test::Person p;
+#define MAX_LINE 4096
+char *MSG = "aaaaaaa bbbbbbbbb ccccccc  ddddd";
 
 void listener_cb(struct evconnlistener *, evutil_socket_t,
 		struct sockaddr *, int socklen, void *);
@@ -27,6 +32,8 @@ int main() {
 	struct event *signal_event;
 	struct sockaddr_in sin;
 	
+	p.set_name("msk");
+	
 	base = event_base_new();
 	if (!base) {
 		fprintf(stderr, "Could not initialize libevent!\n");
@@ -36,7 +43,7 @@ int main() {
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(PORT);
-
+	// listener on base
 	listener = evconnlistener_new_bind(base, listener_cb, (void *)base,
 			LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
 			(struct sockaddr*)&sin,
@@ -78,8 +85,10 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	}
 	bufferevent_setcb(bev, conn_readcb, NULL, conn_eventcb, NULL);
 	bufferevent_enable(bev, EV_WRITE|EV_READ);
-
-	bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+	string buf;
+	p.AppendToString(&buf);
+	buf = "msk";
+	bufferevent_write(bev, buf.c_str(), buf.size());
 }
 
 void read_cb(struct bufferevent *bev, void *ctx)
@@ -116,13 +125,15 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data)
 
 void conn_readcb(struct bufferevent *bev, void *user_data)
 {
-	#define MAX_LINE 4096
+	
 	char line[MAX_LINE + 1];
 	int size;
 	evutil_socket_t fd = bufferevent_getfd(bev);
+	//从远端读数据
 	while (size = bufferevent_read(bev, line, MAX_LINE), size > 0) {
 		line[size] = '\0';
-		printf("fd=%u, read line:%s\n", fd, line);
+		printf("fd=%u, server read line:%s\n", fd, line);
+		//再发回去
 		bufferevent_write(bev, line, size);
 	}
 }

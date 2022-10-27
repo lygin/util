@@ -10,19 +10,34 @@ end
 
 add_requires("protobuf-cpp")
 add_requires("apt::libevent-dev", {alias = 'libevent'})
+add_requires("zlib")
+
+target("liblz4")
+    set_kind("static")
+    add_files("lz4/lz4.c")
+
+target("lz4test")
+    set_kind("binary")
+    add_files("lz4/lz4_test.c")
+    add_deps("liblz4")
 
 target("server")
     set_kind("binary")
     add_includedirs("build/.gens")
-    add_files("src/*.cpp")  
+    add_files("src/*.cc")  
     add_files("src/*.proto", {rules = "protobuf.cpp"})
     add_packages("protobuf-cpp")
     add_packages("libevent")
 
 target("client")
     set_kind("binary")
-    add_files("client/*.c")
+    add_files("client/*.cc")
     add_packages("libevent")
+
+target("zlibtest")
+    set_kind("binary")
+    add_files("zlib/*.c")
+    add_packages("zlib")
     
 
 --
