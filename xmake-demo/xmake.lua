@@ -8,9 +8,12 @@ if is_mode("debug") then
     add_defines("DEBUG")
 end
 
-add_requires("protobuf-cpp")
+--add_requires("protobuf-cpp")
 add_requires("apt::libevent-dev", {alias = 'libevent'})
 add_requires("zlib")
+add_requires("apt::libtbb-dev", {alias='tbb'})
+add_requires("apt::librocksdb-dev", {alias='rocksdb'})
+add_requires("apt::libleveldb-dev", {alias='leveldb'})
 
 target("liblz4")
     set_kind("static")
@@ -21,13 +24,13 @@ target("lz4test")
     add_files("lz4/lz4_test.c")
     add_deps("liblz4")
 
-target("server")
-    set_kind("binary")
-    add_includedirs("build/.gens")
-    add_files("src/*.cc")  
-    add_files("src/*.proto", {rules = "protobuf.cpp"})
-    add_packages("protobuf-cpp")
-    add_packages("libevent")
+-- target("server")
+--     set_kind("binary")
+--     add_includedirs("build/.gens")
+--     add_files("src/*.cc")  
+--     add_files("src/*.proto", {rules = "protobuf.cpp"})
+--     add_packages("protobuf-cpp")
+--     add_packages("libevent")
 
 target("client")
     set_kind("binary")
@@ -38,6 +41,19 @@ target("zlibtest")
     set_kind("binary")
     add_files("zlib/*.c")
     add_packages("zlib")
+
+    
+target("tbb")
+    set_kind("binary")
+    add_files("tbb/*.cc")
+    add_packages("tbb")
+
+target("rocksdb")
+    set_kind("binary")
+    add_files("rocksdb/*.cc")
+    add_packages("rocksdb")
+    add_packages("leveldb")
+    add_includedirs("cpp")
     
 
 --

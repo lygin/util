@@ -79,6 +79,8 @@
         "avxintrin.h": "c",
         "immintrin.h": "c",
         "emmintrin.h": "c",
-        "regex": "cpp"
+        "regex": "cpp",
+        "complex": "cpp",
+        "source_location": "cpp"
     }
 }
