@@ -14,6 +14,7 @@ add_requires("zlib")
 add_requires("apt::libtbb-dev", {alias='tbb'})
 add_requires("apt::librocksdb-dev", {alias='rocksdb'})
 add_requires("apt::libleveldb-dev", {alias='leveldb'})
+add_requires("apt::libhiredis-dev", {alias='hiredis'})
 
 target("liblz4")
     set_kind("static")
@@ -54,7 +55,22 @@ target("rocksdb")
     add_packages("rocksdb")
     add_packages("leveldb")
     add_includedirs("cpp")
-    
+
+-- target("rdma")
+--     set_kind("binary")
+--     add_files("rdma/*.cc")
+--     add_includedirs("cpp")
+
+target("redis-async")
+    set_kind("binary")
+    add_files("redis/libevent-hiredis-async.cc")
+    add_packages("hiredis")
+    add_packages("libevent")
+
+target("redis-pipeline")
+    set_kind("binary")
+    add_files("redis/hiredis-pipeline.cc")
+    add_packages("hiredis")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
