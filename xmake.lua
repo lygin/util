@@ -19,13 +19,6 @@ includes("libevent-server")
 includes("rdma")
 includes("nvmf")
 
--- target("pkgtest")
---     set_kind("binary")
---     add_files("pkg_test.cc")
---     add_packages("liblz4")
---     add_linkdirs("$(releasedir)")
---     add_links("liblz4")
-
 
 -- Add some frequently-used compilation flags in xmake.lua
 --
