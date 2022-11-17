@@ -1,0 +1,5 @@
+add_requires("zlib")
+target("zlibtest")
+    set_kind("binary")
+    add_files("*.c")
+    add_packages("zlib")

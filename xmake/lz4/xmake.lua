@@ -1,0 +1,15 @@
+-- package("liblz4")
+--   on_install(function (package)
+--     package.add("includedirs", "lz4")
+--     package.add("links", "lz4")
+--   end)
+-- package_end()
+
+target("liblz4")
+    set_kind("static")
+    add_files("lz4.c")
+
+target("lz4test")
+    set_kind("binary")
+    add_files("lz4_test.c")
+    add_deps("liblz4")
