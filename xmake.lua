@@ -1,23 +1,23 @@
 add_rules("mode.debug", "mode.release")
 
 if is_mode("release") then
-    add_cxflags("-O3 -Og -std=c++14")
+    add_cxxflags("-O3 -Og -std=c++14")
+    add_cflags("-O2")
 end
-
 if is_mode("debug") then
     add_defines("DEBUG")
 end
 
-includes("c_utils")
-includes("lz4")
-includes("zlib")
-includes("tbb")
-includes("rocksdb")
-includes("redis")
-includes("libevent-client")
-includes("libevent-server")
+-- includes("c_utils")
+-- includes("lz4")
+-- includes("zlib")
+-- includes("tbb")
+--includes("rocksdb")
+--includes("redis")
+-- includes("libevent-client")
+-- includes("libevent-server")
 includes("rdma")
-includes("nvmf")
+-- includes("nvmf")
 
 
 -- Add some frequently-used compilation flags in xmake.lua

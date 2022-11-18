@@ -82,6 +82,9 @@
         "regex": "cpp",
         "complex": "cpp",
         "source_location": "cpp",
-        "env.h": "c"
+        "env.h": "c",
+        "rdma_common.h": "c",
+        "rdma_cma.h": "c",
+        "netdb.h": "c"
     }
 }
