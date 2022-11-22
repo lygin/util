@@ -96,9 +96,3 @@ int on_event(struct rdma_cm_event *event)
 
   return r;
 }
-
-void usage(const char *argv0)
-{
-  fprintf(stderr, "usage: %s <mode>\n  mode = \"read\", \"write\"\n", argv0);
-  exit(1);
-}
