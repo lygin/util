@@ -85,6 +85,7 @@
         "env.h": "c",
         "rdma_common.h": "c",
         "rdma_cma.h": "c",
-        "netdb.h": "c"
+        "netdb.h": "c",
+        "nvme_zns.h": "c"
     }
 }
