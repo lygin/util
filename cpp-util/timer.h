@@ -30,11 +30,11 @@ private:
     std::chrono::high_resolution_clock::time_point tp_;
 };
 
-typedef unsigned long long ticks;
-static __inline__ ticks getticks(void)
+/* time = ticks / freq */
+static __inline__ uint64_t getticks(void)
 {
     uint32_t a, d;
 
     asm volatile("rdtsc" : "=a" (a), "=d" (d));
-    return (((ticks)a) | (((ticks)d) << 32));
+    return (((uint64_t)a) | (((uint64_t)d) << 32));
 }

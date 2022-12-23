@@ -1,11 +1,10 @@
-#ifndef STRING_HANDLER_H
-#define STRING_HANDLER_H
+#ifndef _STRING_HANDLER_H_
+#define _STRING_HANDLER_H_
 
 #include <cstring>
 #include <string>
 #include <vector>
 using namespace std;
-
 
 inline string trimright(const string &sStr, const string &s, bool bChar)
 {
@@ -15,8 +14,8 @@ inline string trimright(const string &sStr, const string &s, bool bChar)
     }
 
     /**
-    * 去掉sStr右边的字符串s
-    */
+     * 去掉sStr右边的字符串s
+     */
     if (!bChar)
     {
         if (sStr.length() < s.length())
@@ -33,8 +32,8 @@ inline string trimright(const string &sStr, const string &s, bool bChar)
     }
 
     /**
-    * 去掉sStr右边的 字符串s中的字符
-    */
+     * 去掉sStr右边的 字符串s中的字符
+     */
     string::size_type pos = sStr.length();
     while (pos != 0)
     {
@@ -46,7 +45,8 @@ inline string trimright(const string &sStr, const string &s, bool bChar)
         pos--;
     }
 
-    if (pos == sStr.length()) return sStr;
+    if (pos == sStr.length())
+        return sStr;
 
     return sStr.substr(0, pos);
 }
@@ -59,8 +59,8 @@ inline string trimleft(const string &sStr, const string &s = " \r\n\t", bool bCh
     }
 
     /**
-    * 去掉sStr左边的字符串s
-    */
+     * 去掉sStr左边的字符串s
+     */
     if (!bChar)
     {
         if (sStr.length() < s.length())
@@ -77,8 +77,8 @@ inline string trimleft(const string &sStr, const string &s = " \r\n\t", bool bCh
     }
 
     /**
-    * 去掉sStr左边的 字符串s中的字符
-    */
+     * 去掉sStr左边的 字符串s中的字符
+     */
     string::size_type pos = 0;
     while (pos < sStr.length())
     {
@@ -90,24 +90,21 @@ inline string trimleft(const string &sStr, const string &s = " \r\n\t", bool bCh
         pos++;
     }
 
-    if (pos == 0) return sStr;
+    if (pos == 0)
+        return sStr;
 
     return sStr.substr(pos);
 }
 
 /**
-* @brief  去掉头部以及尾部的字符或字符串.
-* @brief  Remove the head and the tail characters or strings
-*
-* @param sStr    输入字符串
-* @param sStr    input string
-* @param s       需要去掉的字符
-* @param s       the characters which need to be removed
-* @param bChar   如果为true, 则去掉s中每个字符; 如果为false, 则去掉s字符串
-* @param bChar   bool : true, Remove each character in 's'; false, remove the s String
-* @return string 返回去掉后的字符串
-* @return string Return the removed string
-*/
+ * @brief  去掉头部以及尾部的字符或字符串.
+ * @brief  Remove the head and the tail characters or strings
+ *
+ * @param sStr    输入字符串
+ * @param s       需要去掉的字符
+ * @param bChar   如果为true, 则去掉s中每个字符; 如果为false, 则去掉s字符串
+ * @return string 返回去掉后的字符串
+ */
 
 inline string trim(const string &sStr, const string &s, bool bChar)
 {
@@ -117,8 +114,8 @@ inline string trim(const string &sStr, const string &s, bool bChar)
     }
 
     /**
-    * 将完全与s相同的字符串去掉
-    */
+     * 将完全与s相同的字符串去掉
+     */
     if (!bChar)
     {
         return trimright(trimleft(sStr, s, false), s, false);
@@ -147,10 +144,10 @@ inline string replace(const string &sString, const string &sSrc, const string &s
     return sBuf;
 }
 
-inline std::vector<std::string> split(const std::string& str, const std::string& delimiter = " ")
+inline std::vector<std::string> split(const std::string &str, const std::string &delimiter = " ")
 {
-    char* save = nullptr;
-    char* token = strtok_r(const_cast<char*>(str.c_str()), delimiter.c_str(), &save);
+    char *save = nullptr;
+    char *token = strtok_r(const_cast<char *>(str.c_str()), delimiter.c_str(), &save);
     std::vector<std::string> result;
     while (token != nullptr)
     {

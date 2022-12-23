@@ -41,7 +41,7 @@ TEST_CASE("arena") {
     CHECK((reinterpret_cast<uint64_t>(pa) & 7) == 0);
     //glibc malloc 
     Timer t;
-    ticks t1, t2;
+    uint64_t t1, t2;
     t1 = getticks();
     for(int i=0; i<times; ++i) {
         void* x = malloc(8);

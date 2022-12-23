@@ -116,8 +116,8 @@ typedef struct aeEventLoop {
     aeFiredEvent *fired; /* Fired events */
     // 事件处理器的开关
     int stop;
-    // 多路复用库的私有数据
-    void *apidata; /* This is used for polling API specific data */
+    // 多路复用库的私有数据 epoll state
+    void *epoll_state;
 
     // 用于生成时间事件 id
     long long timeEventNextId;
@@ -125,15 +125,16 @@ typedef struct aeEventLoop {
     aeTimeEvent *timeEventHead;
 } aeEventLoop;
 
-typedef struct aeApiState {
+// epoll state
+typedef struct aeEpollState {
 
-    // epoll_event 实例描述符
+    // epoll_event 实例描述符 create by epoll_create
     int epfd;
 
-    // 事件槽
+    // 事件槽 create by malloc
     struct epoll_event *events;
 
-} aeApiState;
+} aeEpollState;
 
 aeEventLoop *aeCreateEventLoop(int setsize);
 void aeDeleteEventLoop(aeEventLoop *eventLoop);
@@ -145,7 +146,12 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags);
 void aeMain(aeEventLoop *eventLoop);
 void aeStop(aeEventLoop *eventLoop);
 
-//time event
+/* 
+ * time event
+ * 返回值决定aeTimeProc是否定期执行 
+ * 返回值为AE_NOMORE 只执行一次
+ * 返回值为ret 每ret ms执行一次
+ */
 long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
         aeTimeProc *proc, void *clientData,
         aeEventFinalizerProc *finalizerProc);
