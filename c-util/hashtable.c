@@ -1615,26 +1615,22 @@ dictType dictTypeHeapStringCopyKeyValue = {
 };
 
 
-/**
- * @brief test
- * 
- */
-int main() {
-    dict *hash = dictCreate(&dictTypeHeapStrings, NULL);
-    char k[10] = "abc";
-    char v[10] = "def";
-    if (dictAdd(hash, k, v)) {
-        printf("add error");
-    }
-    void *res = dictFetchValue(hash, k);
-    if (res) {
-        printf("%s", (char*)res);
-    }
-    dictReplace(hash, k, "xxx");
+// int main() {
+//     dict *hash = dictCreate(&dictTypeHeapStringCopyKeyValue, NULL);
+//     char k[10] = "abc";
+//     char v[10] = "def";
+//     if (dictAdd(hash, k, v)) {
+//         printf("add error");
+//     }
+//     void *res = dictFetchValue(hash, k);
+//     if (res) {
+//         printf("%s", (char*)res);
+//     }
+//     dictReplace(hash, k, "xxx");
 
-    res = dictFetchValue(hash, k);
-    if (res) {
-        printf("%s", (char*)res);
-    }
-    return 0;
-}
+//     res = dictFetchValue(hash, k);
+//     if (res) {
+//         printf("%s", (char*)res);
+//     }
+//     return 0;
+// }

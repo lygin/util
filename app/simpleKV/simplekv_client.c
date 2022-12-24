@@ -55,6 +55,7 @@ void str_cli(int sockfd)
 	
 	while (1)
 	{
+		printf("> ");
 		if (fgets(sendbuf, MAX_LINE, stdin) == NULL) 
 			break;
 		write(sockfd, sendbuf, strlen(sendbuf));

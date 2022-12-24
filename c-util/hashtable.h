@@ -35,8 +35,6 @@
  * 哈希表节点
  */
 typedef struct dictEntry {
-    
-    // 键
     void *key;
 
     // 值
