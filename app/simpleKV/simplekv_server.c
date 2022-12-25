@@ -14,7 +14,7 @@
 
 #include "ae.h"
 #include "logging.h"
-#include "hashtable.h"
+#include "rds_hashtable.h"
 
 #define PORT 7778
 #define MAX_LINE 2048

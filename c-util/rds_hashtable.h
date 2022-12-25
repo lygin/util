@@ -9,7 +9,6 @@
  */
 
 #include <stdint.h>
-#include "slice.h"
 
 
 #ifndef __DICT_H
@@ -36,8 +35,6 @@
  * 哈希表节点
  */
 typedef struct dictEntry {
-    
-    // 键
     void *key;
 
     // 值
@@ -78,9 +75,6 @@ typedef struct dictType {
 
 } dictType;
 
-
-/* This is our hash table structure. Every dictionary has two of this as we
- * implement incremental rehashing, for the old to the new table. */
 /*
  * 哈希表
  *
@@ -126,10 +120,6 @@ typedef struct dict {
 
 } dict;
 
-/* If safe is set to 1 this is a safe iterator, that means, you can call
- * dictAdd, dictFind, and other functions against the dictionary even while
- * iterating. Otherwise it is a non safe iterator, and only dictNext()
- * should be called while iterating. */
 /*
  * 字典迭代器
  *
@@ -167,7 +157,7 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
  */
 #define DICT_HT_INITIAL_SIZE     4
 
-/* ------------------------------- Macros ------------------------------------*/
+
 // 释放给定字典节点的值
 #define dictFreeVal(d, entry) \
     if ((d)->type->valDestructor) \
@@ -221,7 +211,7 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 // 返回给定字典的大小
 #define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size)
 // 返回字典的已有节点数量
-#define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used)
+#define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used) //7
 // 查看字典是否正在 rehash
 #define dictIsRehashing(ht) ((ht)->rehashidx != -1)
 
@@ -230,13 +220,13 @@ dict *dictCreate(dictType *type, void *privDataPtr); //1
 int dictExpand(dict *d, unsigned long size);
 int dictAdd(dict *d, void *key, void *val); //2
 dictEntry *dictAddRaw(dict *d, void *key);
-int dictReplace(dict *d, void *key, void *val); //3 update
+int dictReplace(dict *d, void *key, void *val); //3 DictPut
 dictEntry *dictReplaceRaw(dict *d, void *key);
 int dictDelete(dict *d, const void *key); // 4
 int dictDeleteNoFree(dict *d, const void *key);
-void dictRelease(dict *d); //6
-dictEntry * dictFind(dict *d, const void *key);
-void *dictFetchValue(dict *d, const void *key); // 5
+void dictRelease(dict *d);
+dictEntry * dictFind(dict *d, const void *key);  //5
+void *dictFetchValue(dict *d, const void *key); // 6
 int dictResize(dict *d);
 dictIterator *dictGetIterator(dict *d);
 dictIterator *dictGetSafeIterator(dict *d);
@@ -254,39 +244,11 @@ int dictRehash(dict *d, int n);
 int dictRehashMilliseconds(dict *d, int ms);
 void dictSetHashFunctionSeed(unsigned int initval);
 unsigned int dictGetHashFunctionSeed(void);
+unsigned long dictScan(dict *d, unsigned long v, dictScanFunction *fn, void *privdata);
 
 /* Hash table types */
 extern dictType dictTypeHeapStringCopyKey;
 extern dictType dictTypeHeapStrings;
 extern dictType dictTypeHeapStringCopyKeyValue;
-
-
-#ifdef __cplusplus
-#include <memory>
-using namespace std;
-class HashTable {
-public:
-    HashTable(dictType *type): dict_ (dictCreate(type, nullptr)) {}
-    ~HashTable() {
-        dictRelease(dict_);
-    }
-    int Add(void *key, void *val) {
-        return dictAdd(dict_, key, val);
-    }
-    int Update(void *key, void *val) {
-        return dictReplace(dict_, key, val);
-    }
-    void* Get(const void *key) {
-        return dictFetchValue(dict_, key);
-    }
-    int Delete(const void *key) {
-        return dictDelete(dict_, key);
-    }
-private:
-    dict* dict_;
-};
-
-
-#endif /* __cplusplus */
 
 #endif /* __DICT_H */
