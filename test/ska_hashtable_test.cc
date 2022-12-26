@@ -37,3 +37,8 @@ TEST(stl_hashtable_test, basic) {
     }
 }
 
+/**
+ * 总结：
+ * ska_hashmap性能与stl_unordered_map接近(可能略低3%)，但内存消耗比stl高80%
+*/
+

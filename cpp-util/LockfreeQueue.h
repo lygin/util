@@ -1,4 +1,6 @@
 /**
+ * lock free mpmc and spsc ring queue
+ * cache friendly, bounded
  * Usage: 
  * MPMC: https://github.com/rigtorp/MPMCQueue
  * SPSC: https://github.com/rigtorp/SPSCQueue

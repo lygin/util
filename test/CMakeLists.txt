@@ -25,6 +25,7 @@ add_executable(
   test_main
   ${src}
   ${cutil}/adlist.c
+  ${cutil}/ngx_lock.c
 )
 
 target_link_libraries(

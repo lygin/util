@@ -5,10 +5,11 @@
 #include <mutex>               // NOLINT
 
 /**
- * @brief 读多写少(4:1)或临界区大比mutex性能好
+ * @brief 读多写少(>4:1)或临界区大比mutex性能好
+ * 考虑性能优先选择 ngx_rwlock(性能是该方法的~200%)，不过此方法CPU占用率较低
  * 写优先
  * 写进入后，会等待之前进入的读者读完
- * 写时进入的读者会阻塞
+ * 写进入后，后面进入的读者会阻塞
  */
 class RWLock {
   using mutex_t = std::mutex;
