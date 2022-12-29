@@ -751,7 +751,7 @@ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 }
 
 /**
- * Enqueue one object on a ring (multi-producers safe).
+ * Enqueue one object on a ring (multi-producers safe).NO BLOCKING!
  *
  * This function uses a "compare and set" instruction to move the
  * producer index atomically.
@@ -773,7 +773,7 @@ rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
 }
 
 /**
- * Enqueue one object on a ring (NOT multi-producers safe).
+ * Enqueue one object on a ring (NOT multi-producers safe).NO BLOCKING!
  *
  * @param r
  *   A pointer to the ring structure.
@@ -792,7 +792,7 @@ rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
 }
 
 /**
- * Enqueue one object on a ring.
+ * Enqueue one object on a ring.NO BLOCKING!
  *
  * This function calls the multi-producer or the single-producer
  * version, depending on the default behaviour that was specified at
@@ -889,7 +889,7 @@ rte_ring_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
 }
 
 /**
- * Dequeue one object from a ring (multi-consumers safe).
+ * Dequeue one object from a ring (multi-consumers safe).NO BLOCKING!
  *
  * This function uses a "compare and set" instruction to move the
  * consumer index atomically.
@@ -910,7 +910,7 @@ rte_ring_mc_dequeue(struct rte_ring *r, void **obj_p)
 }
 
 /**
- * Dequeue one object from a ring (NOT multi-consumers safe).
+ * Dequeue one object from a ring (NOT multi-consumers safe).NO BLOCKING!
  *
  * @param r
  *   A pointer to the ring structure.
@@ -928,7 +928,7 @@ rte_ring_sc_dequeue(struct rte_ring *r, void **obj_p)
 }
 
 /**
- * Dequeue one object from a ring.
+ * Dequeue one object from a ring.NO BLOCKING!
  *
  * This function calls the multi-consumers or the single-consumer
  * version depending on the default behaviour that was specified at

@@ -11,7 +11,7 @@ extern "C" {
 
 using namespace std;
 map<int,int> rbtree;
-const int N = 500'000;
+const int N = 20'0000;
 
 ngx_atomic_t rwlock;
 pthread_spinlock_t spinlock;
@@ -157,6 +157,13 @@ TEST(stl_mutex, mutex) {
 }
 
 /**
+ * 结果：
+ * ngx_lock.spin_lock (347 ms)
+ * ngx_lock.rwlock (256 ms)
+ * pthread_lock.spin_lock (261 ms)
+ * pthread_lock.rwlock (1225 ms)
+ * tars_rwlock.rwlock (494 ms)
+ * stl_mutex.mutex (417 ms)
  * 总结：
  * 考虑性能优先使用 ngx_rwlock pthread_spinlock
  * 考虑CPU占用率优先使用 tars_rwlock stl_mutex/pthread_mutex

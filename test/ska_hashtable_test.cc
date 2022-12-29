@@ -4,7 +4,7 @@
 #include <random>
 #include "ska_hashtable.h"
 
-const int N = 500000;
+const int N = 20'0000;
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -38,7 +38,11 @@ TEST(stl_hashtable_test, basic) {
 }
 
 /**
- * 总结：
- * ska_hashmap性能与stl_unordered_map接近(可能略低3%)，但内存消耗比stl高80%
+ * 结果：
+ * ska_hashtable_test.basic (242 ms)
+ * stl_hashtable_test.basic (213 ms)
+ * ska_hashmap内存消耗比stl高80%
+ * 总结:
+ * 优先stl
 */
 

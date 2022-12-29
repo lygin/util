@@ -27,6 +27,7 @@ add_executable(
   ${cutil}/adlist.c
   ${cutil}/ngx_lock.c
   ${cutil}/coroutine.c
+  ${cutil}/rte_ring.c
 )
 
 target_link_libraries(
