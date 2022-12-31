@@ -88,6 +88,7 @@
         "netdb.h": "c",
         "nvme_zns.h": "c",
         "types.h": "c",
-        "*.in": "cpp"
+        "*.in": "cpp",
+        "sched.h": "c"
     }
 }
