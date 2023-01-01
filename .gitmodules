@@ -1,3 +1,6 @@
 [submodule "third_party/erpc"]
 	path = third_party/erpc
 	url = https://github.com/erpc-io/eRPC
+[submodule "third_party/liburing"]
+	path = third_party/liburing
+	url = https://github.com/axboe/liburing

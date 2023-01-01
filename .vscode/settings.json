@@ -89,6 +89,9 @@
         "nvme_zns.h": "c",
         "types.h": "c",
         "*.in": "cpp",
-        "sched.h": "c"
+        "sched.h": "c",
+        "liburing.h": "c",
+        "uio.h": "c",
+        "io_uring.h": "c"
     }
 }
