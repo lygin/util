@@ -9,7 +9,7 @@ extern "C" {
 #include "rte_ring.h"
 }
 
-#include "LockfreeQueue.h"
+#include "LockfreeQueue_nocheck.h"
 
 const int RING_SIZE = (1<<20); //1MB
 const long long N = 10'0000;
@@ -19,7 +19,7 @@ typedef struct cc_queue_node {
 } cc_queue_node_t;
 
 struct rte_ring *r;
-MPMCQueue<cc_queue_node_t*> mpmc_queue(RING_SIZE);
+MPMCRing<cc_queue_node_t*> mpmc_queue(RING_SIZE);
 
 void *enqueue_fun(void *arg)
 {
