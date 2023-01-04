@@ -1,7 +1,6 @@
 #include "spdk/stdinc.h"
 
 #include "spdk/nvme.h"
-#include "spdk/vmd.h"
 #include "spdk/nvme_zns.h"
 #include "spdk/env.h"
 #include "spdk/string.h"
@@ -52,8 +51,7 @@ static void register_ns(struct spdk_nvme_ctrlr *ctrlr, struct spdk_nvme_ns *ns)
 	entry->ns = ns;
 	TAILQ_INSERT_TAIL(&g_namespaces, entry, link);
 
-	printf("  Namespace ID: %d size: %juGB\n", spdk_nvme_ns_get_id(ns),
-				 spdk_nvme_ns_get_size(ns) / 1000'000'000);
+	printf("Namespace ID: %d size: %juGB\n", spdk_nvme_ns_get_id(ns), spdk_nvme_ns_get_size(ns) / 1000000000);
 }
 
 struct hello_world_sequence

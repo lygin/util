@@ -4,3 +4,6 @@
 [submodule "third_party/liburing"]
 	path = third_party/liburing
 	url = https://github.com/axboe/liburing
+[submodule "third_party/spdk"]
+	path = third_party/spdk
+	url = https://github.com/spdk/spdk

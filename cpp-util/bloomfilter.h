@@ -1,3 +1,9 @@
+/**
+ * 布隆过滤器
+ * 如果KeyMayMatch 返回false，则代表key一定不存在
+ * 如果KeyMayMatch 返回true，key可能存在，存在具有一定的错误率，空间越大错误率越低
+*/
+
 #ifndef _BLOOM_FILTER_H_
 #define _BLOOM_FILTER_H_
 
