@@ -1,5 +1,0 @@
-add_requires("apt::libevent-dev", {alias = 'libevent'})
-target("client")
-    set_kind("binary")
-    add_files("*.cc")
-    add_packages("libevent")

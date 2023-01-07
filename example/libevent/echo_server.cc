@@ -1,3 +1,4 @@
+extern "C" {
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
@@ -10,18 +11,16 @@
 #include <event2/listener.h>
 #include <event2/util.h>
 #include <event2/event.h>
-#include "a.pb.h"
-using namespace std;
+}
 
-static const int PORT = 9995;
-test::Person p;
+static const int PORT = 9090;
 #define MAX_LINE 4096
-char *MSG = "aaaaaaa bbbbbbbbb ccccccc  ddddd";
+char buf[MAX_LINE];
+char *MSG = "server connect success\n";
 
 void listener_cb(struct evconnlistener *, evutil_socket_t,
 		struct sockaddr *, int socklen, void *);
-void conn_writecb(struct bufferevent *, void *);
-void conn_readcb(struct bufferevent *, void *);
+void read_cb(struct bufferevent *, void *);
 void conn_eventcb(struct bufferevent *, short, void *);
 void signal_cb(evutil_socket_t, short, void *);
 
@@ -30,8 +29,6 @@ int main() {
 	struct evconnlistener *listener;
 	struct event *signal_event;
 	struct sockaddr_in sin;
-	
-	p.set_name("msk");
 	
 	base = event_base_new();
 	if (!base) {
@@ -52,7 +49,6 @@ int main() {
 		fprintf(stderr, "Could not create a listener!\n");
 		return 1;
 	}
-
 	signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
 
 	if (!signal_event || event_add(signal_event, NULL) < 0) {
@@ -65,8 +61,6 @@ int main() {
 	evconnlistener_free(listener);
 	event_free(signal_event);
 	event_base_free(base);
-
-	printf("done\n");
 	return 0;
 }
 
@@ -82,25 +76,9 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		event_base_loopbreak(base);
 		return;
 	}
-	bufferevent_setcb(bev, conn_readcb, NULL, conn_eventcb, NULL);
+	bufferevent_setcb(bev, read_cb, NULL, conn_eventcb, NULL);
 	bufferevent_enable(bev, EV_WRITE|EV_READ);
-	string buf;
-	p.AppendToString(&buf);
-	buf = "msk";
-	bufferevent_write(bev, buf.c_str(), buf.size());
-}
-
-void read_cb(struct bufferevent *bev, void *ctx)
-{
-}
-
-void conn_writecb(struct bufferevent *bev, void *user_data)
-{
-	struct evbuffer *output = bufferevent_get_output(bev);
-	if (evbuffer_get_length(output) == 0) {
-		printf("flushed answer\n");
-		bufferevent_free(bev);
-	}
+	bufferevent_write(bev, MSG, strlen(MSG)+1);
 }
 
 void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
@@ -114,6 +92,7 @@ void conn_eventcb(struct bufferevent *bev, short events, void *user_data)
 	bufferevent_free(bev);
 }
 
+/* set exit callback*/
 void signal_cb(evutil_socket_t sig, short events, void *user_data)
 {
 	struct event_base *base = (struct event_base *)user_data;
@@ -122,17 +101,13 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data)
 	event_base_loopexit(base, &delay);
 }
 
-void conn_readcb(struct bufferevent *bev, void *user_data)
+/* echo callback*/
+void read_cb(struct bufferevent *bev, void *user_data)
 {
-	
-	char line[MAX_LINE + 1];
 	int size;
 	evutil_socket_t fd = bufferevent_getfd(bev);
-	//从远端读数据
-	while (size = bufferevent_read(bev, line, MAX_LINE), size > 0) {
-		line[size] = '\0';
-		printf("fd=%u, server read line:%s\n", fd, line);
-		//再发回去
-		bufferevent_write(bev, line, size);
+	while (size = bufferevent_read(bev, buf, MAX_LINE), size > 0) {
+		buf[size] = '\0';
+		bufferevent_write(bev, buf, size);
 	}
 }
