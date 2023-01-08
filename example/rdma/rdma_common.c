@@ -38,7 +38,7 @@ struct connection {
   struct ibv_mr *rdma_local_mr;
   struct ibv_mr *rdma_remote_mr;
 
-  struct ibv_mr peer_mr; //used for单边写
+  struct ibv_mr peer_mr;
 
   struct message *recv_msg; //recv buffer
   struct message *send_msg; //send buffer
@@ -103,7 +103,6 @@ void build_connection(struct rdma_cm_id *id)
   conn->connected = 0;
   //5.注册内存
   register_memory(conn);
-  //6.提前放入recv请求,这样server send后能立马接受信息到注册的sge
   post_receives(conn);
 }
 
@@ -130,7 +129,7 @@ void build_context(struct ibv_context *verbs)
   s_ctx->cq = ibv_create_cq(s_ctx->ctx, 10, NULL, s_ctx->comp_channel, 0); /* cqe=10 is arbitrary */
   //5.放一个cq用于验证
   ibv_req_notify_cq(s_ctx->cq, 0);
-  //新建一个线程用于后台poll_cq，处理完成的任务
+
   pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL);
 }
 
@@ -202,23 +201,22 @@ void on_completion(struct ibv_wc *wc)
     die("on_completion: status is not IBV_WC_SUCCESS.");
 
   if (wc->opcode & IBV_WC_RECV) {
-    conn->recv_state++;//切换状态
+    conn->recv_state++;
 
     if (conn->recv_msg->type == MSG_MR) {
       memcpy(&conn->peer_mr, &conn->recv_msg->data.mr, sizeof(conn->peer_mr));
-      post_receives(conn); /*已经接受到mr了，准备接受recv_buf数据了 post_recv only rearm for MSG_MR */
+      post_receives(conn); /* only rearm for MSG_MR */
 
       if (conn->send_state == SS_INIT) /* received peer's MR before sending ours, so send ours back */
         send_mr(conn);
     }
 
-  } else {//IBV_WC_SEND
-    conn->send_state++;//切换状态
+  } else {
+    conn->send_state++;
     printf("send completed successfully.\n");
   }
-  /*send recv已经交换mr了，开始单边写*/
+
   if (conn->send_state == SS_MR_SENT && conn->recv_state == RS_MR_RECV) {
-    
     struct ibv_send_wr wr, *bad_wr = NULL;
     struct ibv_sge sge;
 
@@ -234,7 +232,7 @@ void on_completion(struct ibv_wc *wc)
     wr.sg_list = &sge;
     wr.num_sge = 1;
     wr.send_flags = IBV_SEND_SIGNALED;
-    //单边write 需要对方buf的addr和rkey 无需对方post_receive 
+    //单边write 无需对方post_receive
     wr.wr.rdma.remote_addr = (uintptr_t)conn->peer_mr.addr;//remote_addr
     wr.wr.rdma.rkey = conn->peer_mr.rkey;//rkey
     
@@ -243,12 +241,11 @@ void on_completion(struct ibv_wc *wc)
     sge.lkey = conn->rdma_local_mr->lkey; //lkey
     //单边也是用post_send，只是opcode=IBV_WR_RDMA_WRITE
     ibv_post_send(conn->qp, &wr, &bad_wr);
-    //写完了数据，可以send MSG_DONE信息关闭连接了
+    //这里没有pollcq,可以修改send_msg的原因是write用的local另一块区域rdma_local_region
     conn->send_msg->type = MSG_DONE;
     send_message(conn);
 
   } else if (conn->send_state == SS_DONE_SENT && conn->recv_state == RS_DONE_RECV) {
-    //打印远端单边写到remote_buf的信息
     printf("remote buffer: %s\n", get_peer_message_region(conn));
     //Disconnects a connection and transitions any associated QP to the error state,
     //which will flush any posted work requests to the completion queue.
@@ -264,7 +261,6 @@ void on_connect(void *context)
   ((struct connection *)context)->connected = 1;
 }
 
-//后台线程轮询poll_cq,内置状态机用于处理每次poll到的wc
 void * poll_cq(void *ctx)
 {
   struct ibv_cq *cq;
@@ -306,7 +302,7 @@ void post_receives(struct connection *conn)
 
   sge.addr = (uintptr_t)conn->recv_msg;/* Start address of the local memory buffer */
   sge.length = sizeof(struct message);/* Length of the buffer */
-  sge.lkey = conn->recv_mr->lkey;/* Key of the local Memory Region, is the return value by ibv_reg_mr */
+  sge.lkey = conn->recv_mr->lkey;/* Key of the local Memory Region */
   
   //ibv_post_recv() posts the linked list of work requests (WRs) 
   // starting with wr to the receive queue of the queue pair qp. 
