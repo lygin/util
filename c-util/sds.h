@@ -1,32 +1,28 @@
-#ifndef __SDS_H
-#define __SDS_H
+#ifndef _SDS_H_
+#define _SDS_H_
 
-/*
- * 最大预分配长度
- */
+/*最大预分配长度*/
 #define SDS_MAX_PREALLOC (1024*1024)
 #define zmalloc malloc
+#define zcalloc(x) calloc((x),sizeof(char))
 #define zfree free
 
 #include <sys/types.h>
 #include <stdarg.h>
 
-/*
- * 类型别名，用于指向 sdshdr 的 buf 属性
- */
+/*类型别名，用于指向 sdshdr 的 buf 属性*/
 typedef char *sds;
 
 /*
- * 保存字符串对象的结构,元数据 4+4+8=16B
- * std_string 32B
+ * 保存字符串对象的结构,元数据 4+4=8B
+ * std::string 32B
  */
 struct sdshdr {
     // buf 中已占用空间的长度
     int len;
     // buf 中剩余可用空间的长度
     int free;
-    // 数据空间指针
-    char buf[];
+    char buf[]; //不占用空间（占位符，不是指针）
 };
 
 /*
