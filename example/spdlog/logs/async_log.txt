@@ -1,0 +1,9 @@
+[2023-01-10 20:01:51.063] [async_file_logger] [info] hello
+[2023-01-10 20:01:51.063] [async_file_logger] [error] error
+[2023-01-10 20:01:51.063] [async_file_logger] [warning] warn
+[2023-01-10 20:01:59.873] [async_file_logger] [info] hello
+[2023-01-10 20:01:59.873] [async_file_logger] [error] error
+[2023-01-10 20:01:59.873] [async_file_logger] [warning] warn
+[2023-01-10 20:03:16.026] [async_file_logger] [info] hello
+[2023-01-10 20:03:16.026] [async_file_logger] [error] error
+[2023-01-10 20:03:16.026] [async_file_logger] [warning] warn

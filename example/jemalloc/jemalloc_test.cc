@@ -25,7 +25,7 @@ int main() {
   ticks ed = getticks();
   printf("time %llu\n", ed - start);
   // Dump allocator statistics to stderr.
-  malloc_stats_print(NULL, NULL, NULL);
+  // malloc_stats_print(NULL, NULL, NULL);
   return 0;
 }
 

@@ -5,14 +5,17 @@ extern "C" {
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <sched.h>
 #include "rte_ring.h"
 }
 
 #include "LockfreeQueue_nocheck.h"
+#include "timer.h"
+#include <atomic>
 
 const int RING_SIZE = (1<<20); //1MB
 const long long N = 10'0000;
+std::atomic<int> cpu_id(21);
 
 typedef struct cc_queue_node {
     int data;
@@ -23,6 +26,12 @@ MPMCRing<cc_queue_node_t*> mpmc_queue(RING_SIZE);
 
 void *enqueue_fun(void *arg)
 {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu_id, &cpuset);
+    cpu_id++;
+    /* 0表示绑定当前正在运行的线程 */
+    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
     long long mask = (long long)arg;
     int n = mask >> 1;
     int choice = mask & 1;
@@ -45,6 +54,12 @@ void *enqueue_fun(void *arg)
 
 void *dequeue_func(void *arg)
 {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu_id, &cpuset);
+    cpu_id++;
+    /* 0表示绑定当前正在运行的线程 */
+    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
     int ret;
     long long sum = 0;
     long long mask = (long long)arg;
@@ -90,7 +105,6 @@ TEST(rte_ring_test, basic) {
     pthread_join(pid4, &ret2);
     long long sum1 = (long long)ret1;
     long long sum2 = (long long)ret2;
-    printf("sum 1:%lld sum 2:%lld\n", sum1, sum2);
     ASSERT_EQ(sum1+sum2, (N-1)*N);
     rte_ring_free(r);
 }
@@ -99,6 +113,7 @@ TEST(mpmc_queue_test, basic) {
     int ret = 0;
     pthread_t pid1, pid2, pid3, pid4;
     long long mask = (N << 1) | 1;
+    Timer tm;
     ASSERT_EQ(pthread_create(&pid1, NULL, enqueue_fun, (void *)mask), 0);
     ASSERT_EQ(pthread_create(&pid2, NULL, enqueue_fun, (void *)mask), 0);
     ASSERT_EQ(pthread_create(&pid3, NULL, dequeue_func, (void *)mask), 0);
@@ -111,8 +126,8 @@ TEST(mpmc_queue_test, basic) {
     pthread_join(pid4, &ret2);
     long long sum1 = (long long)ret1;
     long long sum2 = (long long)ret2;
-    printf("sum 1:%lld sum 2:%lld\n", sum1, sum2);
     ASSERT_EQ(sum1+sum2, (N-1)*N);
+    printf("IOPS: %fMops\n", (double)N*4/tm.GetDurationUs());
 }
 
 /**
