@@ -1,107 +1,211 @@
+/* TODO: ADD arena */
 #include <gtest/gtest.h>
-#include <iostream>
-#include <chrono>
+#include <set>
+#include <random>
+#include <future>
 #include <cstdlib>
-#include <pthread.h>
-#include <time.h>
+#include "threadpool_lockfree.h"
+
 #include "skiplist.h"
 
-#define NUM_THREADS 4
-#define TEST_COUNT 10'0000
-SkipList<int, std::string> skipList(18);
+using Key = uint64_t;
 
-void *insertElement(void *threadid)
-{
-  long tid;
-  tid = (long)threadid;
-  int tmp = TEST_COUNT / NUM_THREADS;
-  for (int i = tid; i<TEST_COUNT; i+=NUM_THREADS)
-  {
-    int ret = skipList.insert(i, std::to_string(i));
-    EXPECT_EQ(ret, 0);
+struct TestComparator {
+  int operator()(const Key& a, const Key& b) const {
+    if (a < b) {
+      return -1;
+    } else if (a > b) {
+      return +1;
+    } else {
+      return 0;
+    }
   }
-  pthread_exit(NULL);
+};
+
+TEST(SkipTest, Empty) {
+  TestComparator cmp;
+  SkipList<Key, TestComparator> list(cmp);
+  ASSERT_TRUE(!list.Contains(10));
+
+  SkipList<Key, TestComparator>::Iterator iter(&list);
+  ASSERT_TRUE(!iter.Valid());
+  iter.SeekToFirst();
+  ASSERT_TRUE(!iter.Valid());
+  iter.Seek(100);
+  ASSERT_TRUE(!iter.Valid());
+  iter.SeekForPrev(100);
+  ASSERT_TRUE(!iter.Valid());
+  iter.SeekToLast();
+  ASSERT_TRUE(!iter.Valid());
 }
 
-void *getElement(void *threadid)
-{
-  long tid;
-  tid = (long)threadid;
-  int tmp = TEST_COUNT / NUM_THREADS;
-  for (int i = tid; i<TEST_COUNT; i+=NUM_THREADS)
-  {
-    auto ret = skipList.find(i);
-    EXPECT_TRUE(ret != nullptr);
-    if(ret != nullptr) {
-      EXPECT_EQ(ret->get_value(), std::to_string(i));
+TEST(SkipTest, InsertAndLookup) {
+  const int N = 2000;
+  const int R = 5000;
+  std::set<Key> keys;
+  TestComparator cmp;
+  SkipList<Key, TestComparator> list(cmp);
+  for (int i = 0; i < N; i++) {
+    Key key = rand() % R;
+    if (keys.insert(key).second) {
+      list.Insert(key);
     }
   }
-  pthread_exit(NULL);
+
+  for (int i = 0; i < R; i++) {
+    if (list.Contains(i)) {
+      ASSERT_EQ(keys.count(i), 1U);
+    } else {
+      ASSERT_EQ(keys.count(i), 0U);
+    }
+  }
+
+  // Simple iterator tests
+  {
+    SkipList<Key, TestComparator>::Iterator iter(&list);
+    ASSERT_TRUE(!iter.Valid());
+
+    iter.Seek(0);
+    ASSERT_TRUE(iter.Valid());
+    ASSERT_EQ(*(keys.begin()), iter.key());
+
+    iter.SeekForPrev(R - 1);
+    ASSERT_TRUE(iter.Valid());
+    ASSERT_EQ(*(keys.rbegin()), iter.key());
+
+    iter.SeekToFirst();
+    ASSERT_TRUE(iter.Valid());
+    ASSERT_EQ(*(keys.begin()), iter.key());
+
+    iter.SeekToLast();
+    ASSERT_TRUE(iter.Valid());
+    ASSERT_EQ(*(keys.rbegin()), iter.key());
+  }
+
+  // Forward iteration test
+  for (int i = 0; i < R; i++) {
+    SkipList<Key, TestComparator>::Iterator iter(&list);
+    iter.Seek(i);
+
+    // Compare against model iterator
+    std::set<Key>::iterator model_iter = keys.lower_bound(i);
+    for (int j = 0; j < 3; j++) {
+      if (model_iter == keys.end()) {
+        ASSERT_TRUE(!iter.Valid());
+        break;
+      } else {
+        ASSERT_TRUE(iter.Valid());
+        ASSERT_EQ(*model_iter, iter.key());
+        ++model_iter;
+        iter.Next();
+      }
+    }
+  }
+
+  // Backward iteration test
+  for (int i = 0; i < R; i++) {
+    SkipList<Key, TestComparator>::Iterator iter(&list);
+    iter.SeekForPrev(i);
+
+    // Compare against model iterator
+    std::set<Key>::iterator model_iter = keys.upper_bound(i);
+    for (int j = 0; j < 3; j++) {
+      if (model_iter == keys.begin()) {
+        ASSERT_TRUE(!iter.Valid());
+        break;
+      } else {
+        ASSERT_TRUE(iter.Valid());
+        ASSERT_EQ(*--model_iter, iter.key());
+        iter.Prev();
+      }
+    }
+  }
 }
 
-TEST(skiplist, multi_write)
-{
-  pthread_t threads[NUM_THREADS];
-
-  for (int i = 0; i < NUM_THREADS; i++)
-  {
-    int rc = pthread_create(&threads[i], NULL, insertElement, (void *)i);
-
-    if (rc)
-    {
-      std::cout << "Error:unable to create thread," << rc << std::endl;
-      exit(-1);
+const int N = 2000;
+const int R = 5000;
+std::set<Key> keys;
+int insert(SkipList<Key, TestComparator>& list) {
+  for (int i = 0; i < N; i++) {
+    Key key = rand() % R;
+    if (keys.insert(key).second) {
+      list.Insert(key);
     }
   }
-  for (int i = 0; i < NUM_THREADS; i++)
-  {
-    if (pthread_join(threads[i], NULL) != 0)
-    {
-      perror("pthread_create() error");
-      exit(3);
+  return 1;
+}
+
+void contains(SkipList<Key, TestComparator>& list) {
+  for (int i = 0; i < R; i++) {
+    if (list.Contains(i)) {
+      ASSERT_EQ(keys.count(i), 1U);
+    } else {
+      ASSERT_EQ(keys.count(i), 0U);
     }
   }
 }
 
-TEST(skiplist, multi_read)
-{
-  pthread_t threads[NUM_THREADS];
+void simple_iter(SkipList<Key, TestComparator>& list) {
+  SkipList<Key, TestComparator>::Iterator iter(&list);
+  ASSERT_TRUE(!iter.Valid());
 
-  for (int i = 0; i < NUM_THREADS; i++)
-  {
-    int rc = pthread_create(&threads[i], NULL, getElement, (void *)i);
+  iter.Seek(0);
+  ASSERT_TRUE(iter.Valid());
+  ASSERT_EQ(*(keys.begin()), iter.key());
 
-    if (rc)
-    {
-      std::cout << "Error:unable to create thread," << rc << std::endl;
-      exit(-1);
-    }
-  }
-  for (int i = 0; i < NUM_THREADS; i++)
-  {
-    if (pthread_join(threads[i], NULL) != 0)
-    {
-      perror("pthread_create() error");
-      exit(3);
+  iter.SeekForPrev(R - 1);
+  ASSERT_TRUE(iter.Valid());
+  ASSERT_EQ(*(keys.rbegin()), iter.key());
+
+  iter.SeekToFirst();
+  ASSERT_TRUE(iter.Valid());
+  ASSERT_EQ(*(keys.begin()), iter.key());
+
+  iter.SeekToLast();
+  ASSERT_TRUE(iter.Valid());
+  ASSERT_EQ(*(keys.rbegin()), iter.key());
+}
+
+void forward_iter(SkipList<Key, TestComparator>& list) {
+  for (int i = 0; i < R; i++) {
+    SkipList<Key, TestComparator>::Iterator iter(&list);
+    iter.Seek(i);
+
+    // Compare against model iterator
+    std::set<Key>::iterator model_iter = keys.lower_bound(i);
+    for (int j = 0; j < 3; j++) {
+      if (model_iter == keys.end()) {
+        ASSERT_TRUE(!iter.Valid());
+        break;
+      } else {
+        ASSERT_TRUE(iter.Valid());
+        ASSERT_EQ(*model_iter, iter.key());
+        ++model_iter;
+        iter.Next();
+      }
     }
   }
 }
 
-/**
- * 结果：
- * 1 thread:
- * skiplist.multi_write (44 ms) [43ms if no mutex protect]
- * skiplist.multi_read (35 ms)
- * 2 thread:
- * skiplist.multi_write (116 ms)
- * skiplist.multi_read (18 ms)
- * 4 thread:
- * skiplist.multi_write (124 ms)
- * skiplist.multi_read (12 ms)
- * 8 thread:
- * skiplist.multi_write (117 ms)
- * skiplist.multi_read (5 ms)
- * 16 thread:
- * skiplist.multi_write (136 ms)
- * skiplist.multi_read (3 ms)
-*/
+// We want to make sure that with a single writer and multiple
+// concurrent readers (with no synchronization other than when a
+// reader's iterator is created)
+TEST(SkipTest, Concurent) {
+  lockfree::ThreadPool<1024> tp(4);
+  TestComparator cmp;
+  SkipList<Key, TestComparator> list(cmp);
+  std::future<int> done;
+  done = tp.enqueue(
+    [&](){return insert(list);}
+  );
+  done.get();
+  tp.enqueue(
+    [&]{contains(list);}
+  );
+  tp.enqueue(
+    [&]{simple_iter(list);}
+  );
+  tp.enqueue(
+    [&]{forward_iter(list);}
+  );
+}

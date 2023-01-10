@@ -1,4 +1,6 @@
-#pragma once
+#ifndef _SLICE_H_
+#define _SLICE_H_
+
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -76,3 +78,5 @@ inline bool operator==(const Slice& x, const Slice& y) {
 }
 
 inline bool operator!=(const Slice& x, const Slice& y) { return !(x == y); }
+
+#endif

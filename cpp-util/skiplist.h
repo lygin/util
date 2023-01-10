@@ -1,344 +1,316 @@
-/**
- * Simple skiplist
- * suport multi_read or multi_write [write is protected by mutex]
- * not support mix_read_write [if necessary, add lock to read]
-*/
-#include <iostream> 
-#include <cstdlib>
-#include <cmath>
-#include <cstring>
-#include <mutex>
-#include <fstream>
+// Writes require external synchronization, most likely a mutex.
+// Reads require a guarantee that the SkipList will not be destroyed
+// while the read is in progress.  Apart from that, reads progress
+// without any internal locking or synchronization.
+#pragma once
+#include <assert.h>
+#include <stdlib.h>
+#include <atomic>
 
-#define STORE_FILE "store/dumpFile"
-std::string delimiter = ":"; // dump file
-
-//Class template to implement node
-template<typename K, typename V> 
-class Node {
-
-public:
-    
-    Node() {} 
-
-    Node(const K& k,const V& v, int); 
-
-    ~Node();
-
-    K get_key() const;
-
-    V get_value() const;
-
-    void set_value(const V&);
-    
-    // Linear array to hold pointers to next node of different level
-    Node<K, V> **forward;
-
-    int node_level;
-
-private:
-    K key;
-    V value;
-};
-
-template<typename K, typename V> 
-Node<K, V>::Node(const K& k, const V& v, int level) {
-    this->key = k;
-    this->value = v;
-    this->node_level = level; 
-
-    // level + 1, because array index is from 0 - level
-    this->forward = new Node<K, V>*[level+1];
-    
-	  // Fill forward array with 0(NULL) 
-    memset(this->forward, 0, sizeof(Node<K, V>*)*(level+1));
-};
-
-template<typename K, typename V> 
-Node<K, V>::~Node() {
-    delete []forward;
-};
-
-template<typename K, typename V> 
-K Node<K, V>::get_key() const {
-    return key;
-};
-
-template<typename K, typename V> 
-V Node<K, V>::get_value() const {
-    return value;
-};
-template<typename K, typename V> 
-void Node<K, V>::set_value(const V& value) {
-    this->value=value;
-};
-
-// Class template for Skip list
-template <typename K, typename V> 
+template<typename K, class Cmp>
 class SkipList {
+public:
+	class Iterator;
+	explicit SkipList(Cmp cmp,int32_t max_height=12, int32_t branching_factor=4):
+		kMaxHeight_(max_height), 
+		kBranching_(branching_factor),
+		kScaledInverseBranching_(2147483647L/kBranching_),
+		compare_(cmp),
+		head_(NewNode(0, max_height)),
+		max_height_(1),
+		prev_height_(1) {
+			assert(max_height > 0 && kMaxHeight_ == static_cast<uint32_t>(max_height));
+			assert(branching_factor > 0 && kBranching_ == static_cast<uint32_t>(branching_factor));
+			assert(kScaledInverseBranching_ > 0);
+			prev_ = (Node**)malloc(sizeof(Node*) * kMaxHeight_);
+			for(int i=0; i<kMaxHeight_; i++) {
+				head_->SetNext(i, nullptr);
+				prev_[i] = head_;
+			}
+	}
+		
+	SkipList(const SkipList& other) = delete;
+	void operator=(const SkipList& other) = delete;
 
-public: 
-    SkipList(int);
-    ~SkipList();
-    int get_random_level();
-    Node<K, V>* create_node(const K&, const V&, int);
-    int insert(const K&, const V&);
-    Node<K, V>* find(const K&);
-    void erase(const K&);
-    void dump_file();
-    void load_file();
-    int size();
+	void Insert(const K& key) {
+		// fast path for sequential insertion
+		if (!KeyIsAfterNode(key, prev_[0]->NoBarrier_Next(0)) &&
+				(prev_[0] == head_ || KeyIsAfterNode(key, prev_[0]))) {
+			assert(prev_[0] != head_ || (prev_height_ == 1 && GetMaxHeight() == 1));
 
-private:
-    void get_key_value_from_string(const std::string& str, std::string* key, std::string* value);
-    bool is_valid_string(const std::string& str);
+			for (int i = 1; i < prev_height_; i++) {
+				prev_[i] = prev_[0];
+			}
+		} else {
+			FindLessThan(key, prev_);
+		}
 
-private:    
-    // Maximum level of the skip list 
-    int _max_level;
+		// Our data structure does not allow duplicate insertion
+		assert(prev_[0]->Next(0) == nullptr || !Equal(key, prev_[0]->Next(0)->key));
 
-    // current level of skip list 
-    int _skip_list_level;
+		int height = RandomHeight();
+		if (height > GetMaxHeight()) {
+			for (int i = GetMaxHeight(); i < height; i++) {
+				prev_[i] = head_;
+			}
 
-    // pointer to header node 
-    Node<K, V> *_header;
+			// It is ok to mutate max_height_ without any synchronization
+			// with concurrent readers. 
+			max_height_.store(height, std::memory_order_relaxed);
+		}
 
-    // file operator
-    std::ofstream _file_writer;
-    std::ifstream _file_reader;
+		Node* x = NewNode(key, height);
+		for (int i = 0; i < height; i++) {
+			x->NoBarrier_SetNext(i, prev_[i]->NoBarrier_Next(i));
+			prev_[i]->SetNext(i, x);
+		}
+		prev_[0] = x;
+		prev_height_ = height;
+	}
 
-    // skiplist current element count
-    int _element_count;
-    // mutex for critical section
-    std::mutex mtx;
+	bool Contains(const K& key) const {
+		Node* x = FindGreaterOrEqual(key);
+		if (x != nullptr && Equal(key, x->key)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	uint64_t EstimateCount(const K& key) const {
+		uint64_t count = 0;
+
+		Node* x = head_;
+		int level = GetMaxHeight() - 1;
+		while (true) {
+			assert(x == head_ || compare_(x->key, key) < 0);
+			Node* next = x->Next(level);
+			if (next == nullptr || compare_(next->key, key) >= 0) {
+				if (level == 0) {
+					return count;
+				} else {
+					// Switch to next list
+					count *= kBranching_;
+					level--;
+				}
+			} else {
+				x = next;
+				count++;
+			}
+		}
+	}
+	private:
+	struct Node;
+	const uint16_t kMaxHeight_;
+	const uint16_t kBranching_;
+	const uint32_t kScaledInverseBranching_;
+
+	Cmp const compare_;
+	Node* const head_;
+
+	std::atomic<int> max_height_;  // Height of the entire list
+	// Used for optimizing sequential insert patterns.
+	Node** prev_;
+	int32_t prev_height_;
+
+	Node* NewNode(const K& key, int height) {
+		char* mem = (char*)malloc(sizeof(Node) + sizeof(std::atomic<Node*>)*(height - 1));
+		return new (mem) Node(key);
+	}
+
+	int RandomHeight() {
+		int height = 1;
+		while(height < kMaxHeight_ && rand() < kScaledInverseBranching_) height++;
+		assert(height > 0);
+		assert(height < kMaxHeight_);
+		return height;
+	}
+	bool KeyIsAfterNode(const K& key, Node* n) const {
+		// nullptr n is considered infinite
+		return (n != nullptr) && (compare_(n->key, key) < 0);
+	}
+
+	inline int GetMaxHeight() const {
+    return max_height_.load(std::memory_order_relaxed);
+  }
+
+	bool Equal(const K& a, const K& b) const { return (compare_(a, b) == 0); }
+	bool LessThan(const K& a, const K& b) const {
+    return (compare_(a, b) < 0);
+  }
+
+	// Returns the earliest node with a key >= key.
+  // Return nullptr if there is no such node.
+	Node *FindGreaterOrEqual(const K& key) const {
+		Node* x = head_;
+		int level = GetMaxHeight() - 1;
+		Node* last_bigger = nullptr;
+		while (true) {
+			assert(x != nullptr);
+			Node* next = x->Next(level);
+			// Make sure the lists are sorted
+			assert(x == head_ || next == nullptr || KeyIsAfterNode(next->key, x));
+			// Make sure we haven't overshot during our search
+			assert(x == head_ || KeyIsAfterNode(key, x));
+			int cmp = (next == nullptr || next == last_bigger) ? 1 : compare_(next->key, key);
+			if (cmp == 0 || (cmp > 0 && level == 0)) {
+				return next;
+			} else if (cmp < 0) {
+				// Keep searching in this list
+				x = next;
+			} else {
+				// Switch to next list, reuse compare_() result
+				last_bigger = next;
+				level--;
+			}
+		}
+	}
+
+	// Return the latest node with a key < key.
+  // Return head_ if there is no such node.
+	Node *FindLessThan(const K& key, Node** prev=nullptr) const {
+		Node* x = head_;
+		int level = GetMaxHeight() - 1;
+		// KeyIsAfter(key, last_not_after) is definitely false
+		Node* last_not_after = nullptr;
+		while (true) {
+			assert(x != nullptr);
+			Node* next = x->Next(level);
+			assert(x == head_ || next == nullptr || KeyIsAfterNode(next->key, x));
+			assert(x == head_ || KeyIsAfterNode(key, x));
+			if (next != last_not_after && KeyIsAfterNode(key, next)) {
+				// Keep searching in this list
+				x = next;
+			} else {
+				if (prev != nullptr) {
+					prev[level] = x;
+				}
+				if (level == 0) {
+					return x;
+				} else {
+					// Switch to next list, reuse KeyIUsAfterNode() result
+					last_not_after = next;
+					level--;
+				}
+			}
+		}
+	}
+
+	Node *FindLast() const {
+		Node* x = head_;
+		int level = GetMaxHeight() - 1;
+		while (true) {
+			Node* next = x->Next(level);
+			if (next == nullptr) {
+				if (level == 0) {
+					return x;
+				} else {
+					// Switch to next list
+					level--;
+				}
+			} else {
+				x = next;
+			}
+		}
+	}
 };
 
-// create new node 
-template<typename K, typename V>
-Node<K, V>* SkipList<K, V>::create_node(const K& k, const V& v, int level) {
-    Node<K, V> *n = new Node<K, V>(k, v, level);
-    return n;
-}
+template<typename K, class Cmp>
+struct SkipList<K, Cmp>::Node {
+	K const key;
+	explicit Node(const K& k): key(k) {}
 
-// Insert given key and value in skip list 
-// return 1 means element exists  
-// return 0 means insert successfully
-template<typename K, typename V>
-int SkipList<K, V>::insert(const K& key, const V& value) {
-    
-    mtx.lock();
-    Node<K, V> *current = this->_header;
-
-    // create update array and initialize it 
-    // update is array which put node that the node->forward[i] should be operated later
-    Node<K, V> *update[_max_level+1];
-    memset(update, 0, sizeof(Node<K, V>*)*(_max_level+1));  
-
-    // start form highest level of skip list 
-    for(int i = _skip_list_level; i >= 0; i--) {
-        while(current->forward[i] != NULL && current->forward[i]->get_key() < key) {
-            current = current->forward[i]; 
-        }
-        update[i] = current;
-    }
-
-    // reached level 0 and forward pointer to right node, which is desired to insert key.
-    current = current->forward[0];
-
-    // if current node have key equal to searched key, we get it
-    if (current != NULL && current->get_key() == key) {
-        mtx.unlock();
-        return 1;
-    }
-
-    // if current is NULL that means we have reached to end of the level 
-    // if current's key is not equal to key that means we have to insert node between update[0] and current node 
-    if (current == NULL || current->get_key() != key ) {
-        
-        // Generate a random level for node
-        int random_level = get_random_level();
-
-        // If random level is greater thar skip list's current level, initialize update value with pointer to header
-        if (random_level > _skip_list_level) {
-            for (int i = _skip_list_level+1; i < random_level+1; i++) {
-                update[i] = _header;
-            }
-            _skip_list_level = random_level;
-        }
-
-        // create new node with random level generated 
-        Node<K, V>* inserted_node = create_node(key, value, random_level);
-        
-        // insert node 
-        for (int i = 0; i <= random_level; i++) {
-            inserted_node->forward[i] = update[i]->forward[i];
-            update[i]->forward[i] = inserted_node;
-        }
-        _element_count ++;
-    }
-    mtx.unlock();
-    return 0;
-}
-
-// Dump data in memory to file 
-template<typename K, typename V> 
-void SkipList<K, V>::dump_file() {
-    _file_writer.open(STORE_FILE);
-    Node<K, V> *node = this->_header->forward[0]; 
-
-    while (node != NULL) {
-        _file_writer << node->get_key() << ":" << node->get_value() << "\n";
-        std::cout << node->get_key() << ":" << node->get_value() << ";\n";
-        node = node->forward[0];
-    }
-
-    _file_writer.flush();
-    _file_writer.close();
-    return ;
-}
-
-// Load data from disk
-template<typename K, typename V> 
-void SkipList<K, V>::load_file() {
-
-    _file_reader.open(STORE_FILE);
-    std::string line;
-    std::string* key = new std::string();
-    std::string* value = new std::string();
-    while (getline(_file_reader, line)) {
-        get_key_value_from_string(line, key, value);
-        if (key->empty() || value->empty()) {
-            continue;
-        }
-        insert(*key, *value);
-    }
-    _file_reader.close();
-}
-
-// Get current SkipList size 
-template<typename K, typename V> 
-int SkipList<K, V>::size() { 
-    return _element_count;
-}
-
-template<typename K, typename V>
-void SkipList<K, V>::get_key_value_from_string(const std::string& str, std::string* key, std::string* value) {
-
-    if(!is_valid_string(str)) {
-        return;
-    }
-    *key = str.substr(0, str.find(delimiter));
-    *value = str.substr(str.find(delimiter)+1, str.length());
-}
-
-template<typename K, typename V>
-bool SkipList<K, V>::is_valid_string(const std::string& str) {
-
-    if (str.empty()) {
-        return false;
-    }
-    if (str.find(delimiter) == std::string::npos) {
-        return false;
-    }
-    return true;
-}
-
-// erase element from skip list 
-template<typename K, typename V> 
-void SkipList<K, V>::erase(const K& key) {
-
-    mtx.lock();
-    Node<K, V> *current = this->_header; 
-    Node<K, V> *update[_max_level+1];
-    memset(update, 0, sizeof(Node<K, V>*)*(_max_level+1));
-
-    // start from highest level of skip list
-    for (int i = _skip_list_level; i >= 0; i--) {
-        while (current->forward[i] !=NULL && current->forward[i]->get_key() < key) {
-            current = current->forward[i];
-        }
-        update[i] = current;
-    }
-
-    current = current->forward[0];
-    if (current != NULL && current->get_key() == key) {
-       
-        // start for lowest level and erase the current node of each level
-        for (int i = 0; i <= _skip_list_level; i++) {
-
-            // if at level i, next node is not target node, break the loop.
-            if (update[i]->forward[i] != current) 
-                break;
-
-            update[i]->forward[i] = current->forward[i];
-        }
-
-        // Remove levels which have no elements
-        while (_skip_list_level > 0 && _header->forward[_skip_list_level] == 0) {
-            _skip_list_level --; 
-        }
-        _element_count --;
-    }
-    mtx.unlock();
-    return;
-}
-
-// Search for element in skip list 
-template<typename K, typename V> 
-Node<K,V>* SkipList<K, V>::find(const K& key) {
-
-    Node<K, V> *current = _header;
-
-    // start from highest level of skip list
-    for (int i = _skip_list_level; i >= 0; i--) {
-        while (current->forward[i] && current->forward[i]->get_key() < key) {
-            current = current->forward[i];
-        }
-    }
-
-    //reached level 0 and advance pointer to right node, which we search
-    current = current->forward[0];
-
-    // if current node have key equal to searched key, we get it
-    if (current and current->get_key() == key) {
-        return current;
-    }
-    return nullptr;
-}
-
-// construct skip list
-template<typename K, typename V> 
-SkipList<K, V>::SkipList(int max_level) {
-
-    this->_max_level = max_level;
-    this->_skip_list_level = 0;
-    this->_element_count = 0;
-
-    // create header node and initialize key and value to null
-    K k;
-    V v;
-    this->_header = new Node<K, V>(k, v, _max_level);
+	Node *Next(int n) {
+		assert(n >= 0);
+		// Use an 'acquire load' so that we observe a fully initialized
+    // version of the returned Node.
+		return next_[n].load(std::memory_order_acquire);
+	}
+	void SetNext(int n, Node *next) {
+		assert(n >= 0);
+		// Use a 'release store' so that anybody who reads through this
+    // pointer observes a fully initialized version of the inserted node
+		next_[n].store(next, std::memory_order_release);
+	}
+	// No-barrier variants that can be safely used in a few locations.
+	Node* NoBarrier_Next(int n) {
+    assert(n >= 0);
+    return next_[n].load(std::memory_order_relaxed);
+  }
+	void NoBarrier_SetNext(int n, Node* x) {
+    assert(n >= 0);
+    next_[n].store(x, std::memory_order_relaxed);
+  }
+	private:
+	// Array of length equal to the node height.  next_[0] is lowest level link.
+	std::atomic<Node*> next_[1];
 };
+template<typename K, class Cmp>
+class SkipList<K, Cmp>::Iterator {
+	public:
+	// Initialize an iterator over the specified list.
+	// The returned iterator is not valid.
+	explicit Iterator(const SkipList* list) {
+		SetList(list);
+	}
 
-template<typename K, typename V> 
-SkipList<K, V>::~SkipList() {
+	void SetList(const SkipList* list) {
+		list_ = list;
+		node_ = nullptr;
+	}
 
-    if (_file_writer.is_open()) {
-        _file_writer.close();
-    }
-    if (_file_reader.is_open()) {
-        _file_reader.close();
-    }
-    delete _header;
-}
+	bool Valid() const {
+		return node_ != nullptr;
+	}
 
-template<typename K, typename V>
-int SkipList<K, V>::get_random_level(){
+	// Returns the key at the current position.
+	const K& key() const {
+		assert(Valid());
+		return node_->key;
+	}
 
-    int k = 1;
-    while (rand() % 2) {
-        k++;
-    }
-    k = (k < _max_level) ? k : _max_level;
-    return k;
+	void Next() {
+		assert(Valid());
+  	node_ = node_->Next(0);
+	}
+
+	void Prev() {
+		assert(Valid());
+  	node_ = list_->FindLessThan(node_->key);
+  	if (node_ == list_->head_) {
+    	node_ = nullptr;
+  	}
+	}
+
+	// Advance to the first entry with a key >= target
+	void Seek(const K& target) {
+		node_ = list_->FindGreaterOrEqual(target);
+	}
+
+	// Retreat to the last entry with a key <= target
+	void SeekForPrev(const K& target) {
+		Seek(target);
+  	if (!Valid()) {
+			SeekToLast();
+		}
+		while (Valid() && list_->LessThan(target, key())) {
+			Prev();
+		}
+	}
+
+	void SeekToFirst() {
+		node_ = list_->head_->Next(0);
+	}
+
+	void SeekToLast() {
+		node_ = list_->FindLast();
+		if (node_ == list_->head_) {
+			node_ = nullptr;
+		}
+	}
+
+	private:
+	const SkipList* list_;
+	Node* node_;
+	// Intentionally copyable
 };

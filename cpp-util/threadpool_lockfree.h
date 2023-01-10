@@ -11,7 +11,7 @@
 
 namespace lockfree {
 
-template<int QUEUE_SIZE>
+template<int QUEUE_SIZE=1024>
 class ThreadPool
 {
 public:
