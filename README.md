@@ -1,5 +1,4 @@
 ## Utils for c/cpp
----
 ### util includes:
 - hashtable
 - bitmap
@@ -10,7 +9,7 @@
 - mempool
 - epoll event reactor
 - logging
-- lock
+- spinlock/rwlock
 - lockfree ring queue
 - timer
 - bufferpool
