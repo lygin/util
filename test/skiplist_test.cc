@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include "threadpool_lockfree.h"
 #include "Random.h"
-
 #include "skiplist.h"
 
 using Key = uint64_t;

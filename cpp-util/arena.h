@@ -1,3 +1,7 @@
+/**
+ * no thread safty, used for thread local
+ * no free function for performance, when arena destructor is called, all memory is freed
+*/
 #ifndef _ARENA_H_
 #define _ARENA_H_
 
@@ -5,62 +9,98 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 
-//Mem allocator，没有free，Arena销毁时自动释放所有内存
-//线程不安全，单线程使用
-class Arena {
+class Allocator {
  public:
-  Arena();
+  virtual ~Allocator() {}
+
+  virtual char* Allocate(size_t bytes) = 0;
+  virtual char* AllocateAligned(size_t bytes) = 0;
+};
+
+class Arena : public Allocator {
+  static const int kBlockSize = 4096;
+ public:
+  Arena() : alloc_ptr_(nullptr), alloc_bytes_remaining_(0), memory_usage_(0) {}
 
   Arena(const Arena&) = delete;
   Arena& operator=(const Arena&) = delete;
 
-  ~Arena();
+  ~Arena() {
+    for (size_t i = 0; i < blocks_.size(); i++) {
+      free(blocks_[i]);
+    }
+  }
 
-  // Return a pointer to a newly allocated memory block of "bytes" bytes.
-  char* Allocate(size_t bytes);
+  char* Allocate(size_t bytes) {
+    assert(bytes > 0);
+    if (bytes < alloc_bytes_remaining_) {
+      char *ptr = alloc_ptr_;
+      alloc_ptr_ += bytes;
+      alloc_bytes_remaining_ -= bytes;
+      return ptr;
+    }
+    return AllocateFallback(bytes);
+  }
+  // alignas(8)
+  char* AllocateAligned(size_t bytes) {
+    const int align = sizeof(void*);
+    size_t mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align - 1);
+    size_t padding = (mod == 0 ? 0 : align - mod);
+    // ptr|padding|ptr(aligned 8)
+    size_t needed = padding + bytes;
+    char* ptr;
+    if (needed <= alloc_bytes_remaining_) {
+      ptr = alloc_ptr_ + padding;
+      alloc_ptr_ += needed;
+      alloc_bytes_remaining_ -= needed;
+    } else {
+      ptr = AllocateFallback(bytes);
+    }
+    // check if ptr is aligned
+    assert((reinterpret_cast<uintptr_t>(ptr) & (align - 1)) == 0);
+    return ptr;
+  }
 
-  // Allocate memory with the normal alignment guarantees provided by malloc.
-  char* AllocateAligned(size_t bytes);
-
-  // Returns an estimate of the total memory usage of data allocated
-  // by the arena.
   size_t MemoryUsage() const {
     return memory_usage_.load(std::memory_order_relaxed);
   }
 
  private:
-  char* AllocateFallback(size_t bytes);
-  char* AllocateNewBlock(size_t block_bytes);
+  char* AllocateFallback(size_t bytes) {
+    // Object is more than a quarter of our block size.  Allocate it separately
+    // to avoid wasting too much space in current block leftover bytes.
+    if (bytes > kBlockSize / 4) {
+      char* result = AllocateNewBlock(bytes);
+      return result;
+    }
+    // We waste the remaining space in the current block.
+    alloc_ptr_ = AllocateNewBlock(kBlockSize);
+    alloc_bytes_remaining_ = kBlockSize;
 
-  // Allocation state，最新block可分配的开始地址
+    char* ptr = alloc_ptr_;
+    alloc_ptr_ += bytes;
+    alloc_bytes_remaining_ -= bytes;
+    return ptr;
+  }
+  char* AllocateNewBlock(size_t block_bytes) {
+    char* ptr = (char*)malloc(block_bytes);
+    blocks_.push_back(ptr);
+    // ptr + block
+    memory_usage_.fetch_add(block_bytes + sizeof(char*),std::memory_order_relaxed);
+    return ptr;
+  }
+
+  // 最新block可分配的开始地址
   char* alloc_ptr_;
   // 最新block剩余可分配的bytes
   size_t alloc_bytes_remaining_;
-
-  // Array of new[] allocated memory blocks，已经分配的blcok地址
+  // 已经分配的blcok地址
   std::vector<char*> blocks_;
-
   // Total memory usage of the arena.
-  //
-  // TODO(costan): This member is accessed via atomics, but the others are
-  //               accessed without any locking. Is this OK?
   std::atomic<size_t> memory_usage_;
 };
-
-inline char* Arena::Allocate(size_t bytes) {
-  // The semantics of what to return are a bit messy if we allow
-  // 0-byte allocations, so we disallow them here (we don't need
-  // them for our internal use).
-  assert(bytes > 0);
-  if (bytes <= alloc_bytes_remaining_) {
-    char* result = alloc_ptr_;
-    alloc_ptr_ += bytes;
-    alloc_bytes_remaining_ -= bytes;
-    return result;
-  }
-  return AllocateFallback(bytes);
-}
 
 #endif  // _ARENA_H_

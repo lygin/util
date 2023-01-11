@@ -5,7 +5,6 @@ extern "C" {
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <sched.h>
 #include "rte_ring.h"
 }
 
@@ -15,7 +14,6 @@ extern "C" {
 
 const int RING_SIZE = (1<<20); //1MB
 const long long N = 10'0000;
-std::atomic<int> cpu_id(21);
 
 typedef struct cc_queue_node {
     int data;
@@ -26,12 +24,6 @@ MPMCRing<cc_queue_node_t*> mpmc_queue(RING_SIZE);
 
 void *enqueue_fun(void *arg)
 {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(cpu_id, &cpuset);
-    cpu_id++;
-    /* 0表示绑定当前正在运行的线程 */
-    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
     long long mask = (long long)arg;
     int n = mask >> 1;
     int choice = mask & 1;
@@ -54,12 +46,6 @@ void *enqueue_fun(void *arg)
 
 void *dequeue_func(void *arg)
 {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(cpu_id, &cpuset);
-    cpu_id++;
-    /* 0表示绑定当前正在运行的线程 */
-    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
     int ret;
     long long sum = 0;
     long long mask = (long long)arg;
