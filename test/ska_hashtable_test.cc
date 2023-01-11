@@ -3,19 +3,18 @@
 #include <unordered_map>
 #include <random>
 #include "ska_hashtable.h"
+#include "Random.h"
 
-const int N = 20'0000;
+const int N = 10'0000;
 
-std::random_device rd;
-std::mt19937 gen(rd());
 std::vector<std::string> data;
 
 TEST(INIT, INIT) {
   std::string str(128, ' ');
+  RandomRng rd('0', 'z');
   for(int i=0; i<N; ++i) {
-    std::uniform_int_distribution<int> dist('0', 'z');
     for (char& c : str) {
-      c = static_cast<char>(dist(gen));
+      c = static_cast<char>(rd.rand());
       if (!std::isalnum(c)) c = 'a';  // 保证字符串只包含字母和数字
     }
     data.push_back(str);

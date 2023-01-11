@@ -93,5 +93,6 @@
         "liburing.h": "c",
         "uio.h": "c",
         "io_uring.h": "c"
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/third_party/erpc/third_party/HdrHistogram_c"
 }

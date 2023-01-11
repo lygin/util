@@ -1,8 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include "common.h"
-IGNORE_UNUSE static uint32_t dict_hash_function_seed = 5381;
+static uint32_t dict_hash_function_seed = 5381;
 
 inline uint32_t Hash(const void *key, int len, uint32_t seed) {
     const uint32_t m = 0x5bd1e995;

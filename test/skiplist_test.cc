@@ -5,6 +5,7 @@
 #include <future>
 #include <cstdlib>
 #include "threadpool_lockfree.h"
+#include "Random.h"
 
 #include "skiplist.h"
 
@@ -44,9 +45,10 @@ TEST(SkipTest, InsertAndLookup) {
   const int R = 5000;
   std::set<Key> keys;
   TestComparator cmp;
+  RandomRng rd(0, R-1);
   SkipList<Key, TestComparator> list(cmp);
   for (int i = 0; i < N; i++) {
-    Key key = rand() % R;
+    Key key = rd.rand();
     if (keys.insert(key).second) {
       list.Insert(key);
     }
@@ -125,9 +127,11 @@ TEST(SkipTest, InsertAndLookup) {
 const int N = 2000;
 const int R = 5000;
 std::set<Key> keys;
+RandomRng rnd(0, R-1);
+
 int insert(SkipList<Key, TestComparator>& list) {
   for (int i = 0; i < N; i++) {
-    Key key = rand() % R;
+    Key key = rnd.rand();
     if (keys.insert(key).second) {
       list.Insert(key);
     }

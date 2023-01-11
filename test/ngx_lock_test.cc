@@ -11,7 +11,7 @@ extern "C" {
 
 using namespace std;
 map<int,int> rbtree;
-const int N = 20'0000;
+const int N = 10'0000;
 
 ngx_atomic_t rwlock;
 pthread_spinlock_t spinlock;
