@@ -96,7 +96,7 @@ TEST(rte_ring, basic) {
 }
 
 TEST(mpmc_queue, basic) {
-        Timer tm;
+    Timer tm;
     for(int i = 0; i <produce_threads; ++i) {
         (void)std::async(produce, 1);
     }
