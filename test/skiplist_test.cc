@@ -194,7 +194,7 @@ void forward_iter(SkipList<Key, TestComparator>& list) {
 // concurrent readers (with no synchronization other than when a
 // reader's iterator is created)
 TEST(SkipTest, Concurent) {
-  lockfree::ThreadPool<1024> tp(4);
+  lockfree::ThreadPool tp(4, 1024);
   TestComparator cmp;
   SkipList<Key, TestComparator> list(cmp);
   std::future<int> done;

@@ -9,16 +9,11 @@
 #include "lrucache.h"
 #include "arena.h"
 
-// TODO：Arena并发控制
 class BufferPoolManager
 {
 public:
     //pool_size是16的整数倍时，pool_size才精确
     BufferPoolManager(size_t pool_size, DiskManager *disk_manager);
-
-    /**
-     * Destroys an existing BufferPoolManager.
-     */
     ~BufferPoolManager();
 
     LRUEntry *FetchPage(page_id_t page_id);
@@ -39,7 +34,6 @@ private:
         latch_.lock();
         free_list_.emplace_back(pg);
         latch_.unlock();
-        LOG("page %u move to free list", pg->page_id_);
     }
     /** Number of pages in the buffer pool. */
     size_t pool_size_;

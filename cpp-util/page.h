@@ -1,19 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include "rwlock.h"
-
-#define DEBUG
-#ifdef DEBUG
-#define LOG(frm, argc...)                         \
-    {                                             \
-        printf("[%s : %d] ", __func__, __LINE__); \
-        printf(frm, ##argc);                      \
-        printf("\n");                             \
-    }
-#else
-#define LOG(frm, argc...)
-#endif
+#include "tars_rwlock.h"
 
 constexpr int PAGE_SIZE = 4 << 10; // 4KB
 constexpr int INVALID_PAGE_ID = -1;
@@ -64,10 +52,8 @@ protected:
     static constexpr size_t OFFSET_LSN = 4;
 
 private:
-    /** Zeroes out the data that is held within the page. */
-
     /** The actual data that is stored within a page. */
-    char data_[PAGE_SIZE]{};
+    char data_[PAGE_SIZE]{0};
     /** The ID of this page. */
     page_id_t page_id_ = INVALID_PAGE_ID;
     /** True if the page is dirty, i.e. it is different from its corresponding page on disk. */

@@ -9,7 +9,6 @@ using namespace std;
 class XX{
     public:
     ~XX() {
-        LOG("XX is deleted");
     }
 };
 struct VAL{

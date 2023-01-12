@@ -9,17 +9,6 @@
 #include "murmur2.h"
 using namespace std;
 
-#define DEBUG
-#ifdef DEBUG
-#define LOG(frm, argc...)                     \
-  {                                           \
-    printf("[%s : %d] ", __func__, __LINE__); \
-    printf(frm, ##argc);                      \
-    printf("\n");                             \
-  }
-#else
-#define LOG(frm, argc...)
-#endif
 //一个Entry是一个堆分配的struct
 struct LRUEntry
 {

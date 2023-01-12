@@ -1,3 +1,5 @@
+/* Rocksdb skiplist */
+// thread safty:
 // Writes require external synchronization, most likely a mutex.
 // Reads require a guarantee that the SkipList will not be destroyed
 // while the read is in progress.  Apart from that, reads progress
