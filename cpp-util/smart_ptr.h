@@ -1,20 +1,22 @@
+/**
+ * 模仿shared_ptr实现一个智能指针
+ * A very good example
+*/
 #ifndef _SMART_PTR_H_
 #define _SMART_PTR_H_
 
 #include <functional>
 #include "logging.h"
 
-// 模仿shared_ptr实现一个智能指针
 template <typename T> class smart_ptr {
 public:
   smart_ptr();
   explicit smart_ptr(T *);
   smart_ptr(T *, std::function<void(T *)>);
 
-  //拷贝构造
   smart_ptr(const smart_ptr &);
-  //拷贝赋值
   smart_ptr &operator=(const smart_ptr &);
+
   T &operator*() const;
   T *operator->() const;
 
@@ -31,7 +33,6 @@ public:
   T *get() const;
 
 private:
-  // 默认的deleter
   static std::function<void(T *)> default_del;
 
 private:

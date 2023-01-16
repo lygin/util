@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include "tars_rwlock.h"
+#include "rwlock.h"
 
 constexpr int PAGE_SIZE = 4 << 10; // 4KB
 constexpr int INVALID_PAGE_ID = -1;
@@ -14,32 +14,19 @@ class Page
 {
 public:
     friend class BufferPoolManager;
-    /** Constructor. Zeros out the page data. */
     Page() { ResetMemory(); }
-
-    /** Default destructor. */
     ~Page() = default;
 
-    /** @return the actual data contained within this page */
     inline char *GetData() { return data_; }
-
-    /** @return the page id of this page */
     inline page_id_t GetPageId() { return page_id_; }
 
-    /** @return true if the page in memory has been modified from the page on disk, false otherwise */
     inline bool IsDirty() { return is_dirty_; }
 
-    /** Acquire the page write latch. */
     inline void WLatch() { rwlatch_.WLock(); }
+    inline void WUnlatch() { rwlatch_.Unlock(); }
 
-    /** Release the page write latch. */
-    inline void WUnlatch() { rwlatch_.WUnlock(); }
-
-    /** Acquire the page read latch. */
     inline void RLatch() { rwlatch_.RLock(); }
-
-    /** Release the page read latch. */
-    inline void RUnlatch() { rwlatch_.RUnlock(); }
+    inline void RUnlatch() { rwlatch_.Unlock(); }
 
     inline void ResetMemory() { memset(data_, OFFSET_PAGE_START, PAGE_SIZE); }
 
@@ -52,12 +39,8 @@ protected:
     static constexpr size_t OFFSET_LSN = 4;
 
 private:
-    /** The actual data that is stored within a page. */
     char data_[PAGE_SIZE]{0};
-    /** The ID of this page. */
     page_id_t page_id_ = INVALID_PAGE_ID;
-    /** True if the page is dirty, i.e. it is different from its corresponding page on disk. */
     bool is_dirty_ = false;
-    /** Page latch. */
-    RWLock rwlatch_;
+    Rwlock rwlatch_;
 };

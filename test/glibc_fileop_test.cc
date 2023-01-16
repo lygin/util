@@ -4,7 +4,17 @@ extern "C" {
 #include <stdlib.h>
 }
 
-TEST(glibc_fileop_test, fopen_fprintf_fscanf) {
+class GlibcFileOpTest: public ::testing::Test {
+protected:
+   void SetUp() override {
+      remove("file.txt");
+   }
+   void TearDown() override {
+      remove("file.txt");
+   }
+};
+
+TEST_F(GlibcFileOpTest, basic) {
    char str1[10], str2[10], str3[10];
    int year;
    FILE * fp;

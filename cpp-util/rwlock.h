@@ -1,3 +1,4 @@
+#pragma once
 /**
  * very fast read write lock, cpu friendly
  * learn from nginx
@@ -9,20 +10,21 @@ extern "C"
 {
 #include <sched.h>
 }
-
+static int kWlock_ = INT_MAX - 1;
+static int kNone_ = 0;
 class Rwlock
 {
 public:
   bool tryWLock()
   {
-    return lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone, kWlock_);
+    return lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone_, kWlock_);
   }
   void WLock()
   {
     int n, i;
     for (;;)
     {
-      if (lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone, kWlock_))
+      if (lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone_, kWlock_))
       {
         return;
       }
@@ -32,7 +34,7 @@ public:
         {
           __asm__("pause");
         }
-        if (lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone, kWlock_))
+        if (lock_.load(std::memory_order_acquire) == 0 && lock_.compare_exchange_strong(kNone_, kWlock_))
         {
           return;
         }
@@ -90,8 +92,4 @@ public:
 
 private:
   std::atomic<int> lock_;
-  static int kWlock_;
-  static int kNone;
 };
-int Rwlock::kWlock_ = INT_MAX - 1;
-int Rwlock::kNone = 0;

@@ -2,29 +2,27 @@
 
 #include <atomic>
 #include <fstream>
-#include <future> // NOLINT
+#include <future>
 #include <string>
 #include "page.h"
 
 /**
- * 负责Page的alloc和delete。负责page从磁盘的读写。
- * TODO: 并发控制
+ * 负责以page粒度读写磁盘。
  */
 class DiskManager
 {
 public:
     /**
-     * 创建dm
-     * @param db_file 存储Page的文件名
+     * Creates a new disk manager that writes to the specified database file.
+     * @param db_file the file name of the database file to write to
      */
     explicit DiskManager(const std::string &db_file);
-
     ~DiskManager() = default;
-
-    void ShutDown();
-
+    void ShutDown() {
+        db_io_.close();
+        log_io_.close();
+    }
     void WritePage(page_id_t page_id, const char *page_data);
-
     void ReadPage(page_id_t page_id, char *page_data);
 
     /**
@@ -47,15 +45,15 @@ public:
      * Allocate a page on disk.
      * @return the id of the allocated page
      */
-    page_id_t AllocatePage();
+    page_id_t AllocatePage() { return next_page_id_++; }
 
-    void DeallocatePage(page_id_t page_id);
+    void DeallocatePage(page_id_t page_id) {}
 
-    int GetNumFlushes() const;
+    int GetNumFlushes() const { return num_flushes_; }
 
-    bool GetFlushState() const;
+    bool GetFlushState() const { return flush_log_; }
 
-    int GetNumWrites() const;
+    int GetNumWrites() { return num_writes_; }
 
     /**
      * Sets the future which is used to check for non-blocking flushes.
@@ -67,11 +65,13 @@ public:
     inline bool HasFlushLogFuture() { return flush_log_f_ != nullptr; }
 
 private:
-    int GetFileSize(const std::string &file_name);
-    // stream to write log file
+    int GetFileSize(const std::string &file_name) {
+        struct stat stat_buf;
+        int rc = stat(file_name.c_str(), &stat_buf);
+        return rc == 0 ? static_cast<int>(stat_buf.st_size) : -1;
+    }
     std::fstream log_io_;
     std::string log_name_;
-    // stream to write db file
     std::fstream db_io_;
     std::string file_name_;
     std::atomic<page_id_t> next_page_id_;
