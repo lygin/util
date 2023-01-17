@@ -23,6 +23,11 @@ TEST(xxhash, _3_64) {
   }
 }
 
+TEST(xxhash, _3_128) {
+  for(int i=0; i<TEST_NUM; i++) {
+    volatile XXH128_hash_t hash = XXH3_128bits(&i, 4);
+  }
+}
 
 TEST(murmur2, _32) {
   for(int i=0; i<TEST_NUM; i++) {
@@ -35,3 +40,12 @@ TEST(murmur3, _32) {
     volatile uint32_t hash = MurmurHash3_x86_32(&i, 4, 5381);
   }
 }
+
+/**
+ * xxhash._32 (20 ms)
+ * xxhash._64 (22 ms)
+ * xxhash._3_64 (20 ms)
+ * xxhash._3_128 (21 ms)
+ * murmur2._32 (10 ms)
+ * murmur3._32 (20 ms)
+*/
