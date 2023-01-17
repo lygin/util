@@ -74,7 +74,6 @@ __always_inline void EncodeFixed64(char* dst, uint64_t value) {
 
 // Lower-level versions of Get... that read directly from a character buffer
 // without any bounds checking.
-
 __always_inline uint32_t DecodeFixed32(const char* ptr) {
   const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
 

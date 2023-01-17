@@ -1,3 +1,7 @@
+/**
+ * thread safe lru cache implementation
+ * learn from leveldb
+*/
 #pragma once
 #include <cassert>
 #include <cstdio>
@@ -9,15 +13,25 @@
 #include "murmur2.h"
 using namespace std;
 
+// "in_cache" boolean indicating whether the cache has a reference on the entry. 
+// The ways that this can become false:
+// 1. being passed to its "deleter" are via Erase()
+// 2. via Insert() when an element with a duplicate key is inserted
+// 3. on destruction of the cache.
+// the meaning of it:
+// think one client is reading, but other client delete it, we cannot delete it immediately
+// because the former might cannot read value, so we make it in_cache == false and ref==1
+// when the former release it, we can safely delete it
 struct LRUEntry
 {
   void *value;
-  LRUEntry *next_hash; //链表法解决哈希冲突，指向下一个hash（key）相同的节点
+  LRUEntry *next_hash; //链表法解决哈希冲突
   LRUEntry *next;
   LRUEntry *prev;
   size_t key_length;
   uint32_t refs;
   uint32_t hash;     // Hash of key(); used for fast sharding and comparisons
+  bool in_cache;     // Whether entry is in the cache.
   char key_data[1];  // Beginning of key K
 
   Slice key() const
@@ -127,7 +141,7 @@ public:
   ~LRUCache();
 
   inline void SetCapacity(size_t capacity) { capacity_ = capacity; }
-  inline void SetValDeleter(function<void(void *)> deleter) { deleter_ = deleter; }
+  inline void SetValDeleter(function<void(const Slice&, void* value)> deleter) { deleter_ = deleter; }
 
   LRUEntry *Insert(const Slice &key, uint32_t hash, void *value);
   LRUEntry *Lookup(const Slice &key, uint32_t hash);
@@ -154,11 +168,11 @@ private:
   mutable std::mutex mutex_;
   size_t usage_;
 
-  // evict list, refs==1
+  // Entries have refs==1 and in_cache==true.
   LRUEntry lru_;
-  // used by clients(can not evicted), and have refs >= 2
+  // Entries are in use by clients, and have refs >= 2 and in_cache==true.
   LRUEntry in_use_;
-  function<void(void *)> deleter_;
+  function<void(const Slice&, void* value)> deleter_;
   HashTable table_;
 };
 
@@ -178,6 +192,8 @@ inline LRUCache::~LRUCache()
   for (LRUEntry *e = lru_.next; e != &lru_;)
   {
     LRUEntry *next = e->next;
+    assert(e->in_cache);
+    e->in_cache = false;
     assert(e->refs == 1);
     Unref(e);
     e = next;
@@ -187,7 +203,7 @@ inline LRUCache::~LRUCache()
 inline void LRUCache::Ref(LRUEntry *e)
 {
   // If on lru_ list, move to in_use_ list.
-  if (e->refs == 1) { 
+  if (e->refs == 1 && e->in_cache) { 
     LRU_Remove(e);
     LRU_Append(&in_use_, e);
   }
@@ -200,13 +216,16 @@ inline void LRUCache::Unref(LRUEntry *e)
   e->refs--;
   if (e->refs == 0) { 
     // Deallocate.
-    deleter_(e->value);
+    assert(!e->in_cache);
+    deleter_(e->key(), e->value);
     free(e);
-  } else if (e->refs == 1) {
+  } else if (e->in_cache && e->refs == 1) {
     // No longer in use; move to lru_ list.
     LRU_Remove(e);
     LRU_Append(&lru_, e);
   }
+  // if incache==false but refs==1, means one client has removed entry, but currently has client reading
+  // cannot delete yet.
 }
 
 inline void LRUCache::LRU_Remove(LRUEntry *e)
@@ -250,10 +269,12 @@ inline LRUEntry *LRUCache::Insert(const Slice &key, uint32_t hash, void *value)
   e->key_length = key.size();
   e->hash = hash;
   e->refs = 1;
+  e->in_cache = false;
   std::memcpy(e->key_data, key.data(), key.size());
 
   if (capacity_ > 0) {
     e->refs++; // client引用
+    e->in_cache = true;
     LRU_Append(&in_use_, e);
     usage_++;
     //如果是替换，删除旧值
@@ -265,9 +286,9 @@ inline LRUEntry *LRUCache::Insert(const Slice &key, uint32_t hash, void *value)
   }
   while (usage_ > capacity_ && lru_.next != &lru_) {
     // list head is the oldest
-    LRUEntry *old = lru_.next;
-    assert(old->refs == 1);
-    bool erased = FinishErase(table_.Remove(old->key(), old->hash));
+    LRUEntry *oldest = lru_.next;
+    assert(oldest->refs == 1);
+    bool erased = FinishErase(table_.Remove(oldest->key(), oldest->hash));
     if (!erased){
       assert(erased);
     }
@@ -275,11 +296,16 @@ inline LRUEntry *LRUCache::Insert(const Slice &key, uint32_t hash, void *value)
   return e;
 }
 
+// If e != nullptr, finish removing *e from the cache; it has already been
+// removed from the hash table.
+// meanwhile, might have client reading cannot delete it
 inline bool LRUCache::FinishErase(LRUEntry *e)
 {
   if (e != nullptr)
   {
+    assert(e->in_cache);
     LRU_Remove(e);
+    e->in_cache = false;
     usage_--;
     Unref(e);
   }
@@ -322,7 +348,7 @@ private:
   static uint32_t Shard(uint32_t hash) { return hash >> (32 - kNumShardBits); }
 
 public:
-  explicit ShardedLRUCache(size_t capacity, function<void(void *)> deleter)
+  explicit ShardedLRUCache(size_t capacity, function<void(const Slice&, void* value)> deleter)
   {
     const size_t per_shard = (capacity + (kNumShards - 1)) / kNumShards;
     for (int s = 0; s < kNumShards; s++)
@@ -336,6 +362,7 @@ public:
   LRUEntry *Insert(const Slice &key, void *value)
   {
     const uint32_t hash = HashSlice(key);
+    // printf("Insert Page %d Hash %d\n", *(uint32_t*)key.data(), hash);
     return shard_[Shard(hash)].Insert(key, hash, value);
   }
   LRUEntry *Lookup(const Slice &key)
@@ -351,6 +378,7 @@ public:
   void Erase(const Slice &key)
   {
     const uint32_t hash = HashSlice(key);
+    // printf("Remove Page %d Hash %d\n", *(uint32_t*)key.data(), hash);
     shard_[Shard(hash)].Erase(key, hash);
   }
   void *Value(LRUEntry *handle)
@@ -374,3 +402,5 @@ public:
     return total;
   }
 };
+
+using LruCache = ShardedLRUCache;

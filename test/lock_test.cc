@@ -36,7 +36,7 @@ void getn()
 	for (int i = 0; i < N; i++)
 	{
 		ngx_spinlock_lock(&rwlock, 1, 1024);
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		ngx_spinlock_unlock(&rwlock);
 	}
 }
@@ -55,7 +55,7 @@ void getp()
 	for (int i = 0; i < N; i++)
 	{
 		pthread_spin_lock(&spinlock);
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		pthread_spin_unlock(&spinlock);
 	}
 }
@@ -74,7 +74,7 @@ void readn()
 	for (int i = 0; i < N; i++)
 	{
 		ngx_rwlock_rlock(&rwlock);
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		ngx_rwlock_unlock(&rwlock);
 	}
 }
@@ -93,7 +93,7 @@ void readp()
 	for (int i = 0; i < N; i++)
 	{
 		pthread_rwlock_rdlock(&prwlock);
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		pthread_rwlock_unlock(&prwlock);
 	}
 }
@@ -112,7 +112,7 @@ void readt()
 	for (int i = 0; i < N; i++)
 	{
 		trwlock.RLock();
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		trwlock.RUnlock();
 	}
 }
@@ -131,7 +131,7 @@ void readmsk()
 	for (int i = 0; i < N; i++)
 	{
 		msk_rwlock.RLock();
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		msk_rwlock.Unlock();
 	}
 }
@@ -150,7 +150,7 @@ void readmtx()
 	for (int i = 0; i < N; i++)
 	{
 		mtx.lock();
-		ASSERT_TRUE(rbtree[i] == i || rbtree[i] == 0);
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
 		mtx.unlock();
 	}
 }
@@ -201,7 +201,6 @@ TEST(tars_rwlock, rwlock)
 	t1.join();
 	t2.join();
 }
-
 TEST(msk_rwlock, rwlock)
 {
 	rbtree = map<int, int>();
@@ -210,6 +209,7 @@ TEST(msk_rwlock, rwlock)
 	t1.join();
 	t2.join();
 }
+
 
 TEST(stl_mutex, mutex)
 {

@@ -48,7 +48,7 @@ DiskManager::DiskManager(const std::string &db_file)
 }
 
 
-void DiskManager::WritePage(page_id_t page_id, const char *page_data)
+void DiskManager::WritePage(uint32_t page_id, const char *page_data)
 {
     size_t offset = (size_t)page_id * PAGE_SIZE;
     num_writes_ += 1;
@@ -56,17 +56,19 @@ void DiskManager::WritePage(page_id_t page_id, const char *page_data)
     db_io_.write(page_data, PAGE_SIZE);
     if (db_io_.bad())
     {
+        std::cerr << "WritePage failed" << std::endl;
         return;
     }
     db_io_.flush();
 }
 
-void DiskManager::ReadPage(page_id_t page_id, char *page_data)
+void DiskManager::ReadPage(uint32_t page_id, char *page_data)
 {
     int offset = page_id * PAGE_SIZE;
-    if (offset > GetFileSize(file_name_))
+    int file_size = GetFileSize(file_name_);
+    if (offset > file_size)
     {
-        std::cerr << "I/O error while reading" << std::endl;
+        printf("load File failed, read offset %d while filesize %d B\n", offset, file_size);
     }
     else
     {

@@ -1,5 +1,7 @@
 #pragma once
-
+extern "C" {
+#include <sys/stat.h>
+}
 #include <atomic>
 #include <fstream>
 #include <future>
@@ -22,8 +24,8 @@ public:
         db_io_.close();
         log_io_.close();
     }
-    void WritePage(page_id_t page_id, const char *page_data);
-    void ReadPage(page_id_t page_id, char *page_data);
+    void WritePage(uint32_t page_id, const char *page_data);
+    void ReadPage(uint32_t page_id, char *page_data);
 
     /**
      * Flush the entire log buffer into disk.
@@ -45,9 +47,9 @@ public:
      * Allocate a page on disk.
      * @return the id of the allocated page
      */
-    page_id_t AllocatePage() { return next_page_id_++; }
+    uint32_t AllocatePage() { return next_page_id_++; }
 
-    void DeallocatePage(page_id_t page_id) {}
+    void DeallocatePage(uint32_t page_id) {}
 
     int GetNumFlushes() const { return num_flushes_; }
 
@@ -74,7 +76,7 @@ private:
     std::string log_name_;
     std::fstream db_io_;
     std::string file_name_;
-    std::atomic<page_id_t> next_page_id_;
+    std::atomic<uint32_t> next_page_id_;
     int num_flushes_;
     int num_writes_;
     bool flush_log_;

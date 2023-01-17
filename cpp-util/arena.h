@@ -87,6 +87,7 @@ class Arena : public Allocator {
   }
   char* AllocateNewBlock(size_t block_bytes) {
     char* ptr = (char*)malloc(block_bytes);
+    assert(ptr != nullptr);
     blocks_.push_back(ptr);
     // ptr + block
     memory_usage_.fetch_add(block_bytes + sizeof(char*),std::memory_order_relaxed);

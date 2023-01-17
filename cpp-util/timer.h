@@ -2,6 +2,7 @@
 #include <iostream>
 #include <chrono>
 #include <exception>
+#include <cstring>
 
 class Timer
 {
