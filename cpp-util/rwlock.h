@@ -10,8 +10,6 @@ extern "C"
 {
 #include <sched.h>
 }
-static int kWlock_ = INT_MAX - 1;
-static int kNone_ = 0;
 class Rwlock
 {
 public:
@@ -92,4 +90,6 @@ public:
 
 private:
   std::atomic<int> lock_;
+  static int kWlock_;
+  static int kNone_;
 };
