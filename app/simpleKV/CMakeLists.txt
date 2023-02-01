@@ -1,6 +1,16 @@
 project(simpleKV)
+set(CMAKE_CXX_STANDARD 14)
 
-set(util_dir ../../c-util)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+set(cutil ../../c-util)
+set(cpputil ../../cpp-util)
 add_definitions(
   -Wall
   -g
@@ -9,6 +19,7 @@ add_definitions(
 
 
 
-include_directories(${util_dir})
+include_directories(${cutil} ${cpputil})
 add_executable(simplekv_client simplekv_client.c)
-add_executable(simplekv_server ${util_dir}/ae.c ${util_dir}/rds_hashtable.c simplekv_server.c)
+add_executable(simplekv_server simplekv_server.cc ${cutil}/ae.cc)
+target_link_libraries(simplekv_server pthread)

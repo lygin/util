@@ -1,7 +1,10 @@
+extern "C" {
 #include "ae.h"
+}
 #include <time.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <unistd.h>
 /*
  * 创建一个新的 epoll 实例，并将它赋值给 eventLoop
  */
@@ -142,7 +145,7 @@ static int aeEpoll(aeEventLoop *eventLoop, struct timeval *tvp)
 
 static void aeApiFree(aeEventLoop *eventLoop)
 {
-    aeEpollState *state = eventLoop->epoll_state;
+    aeEpollState *state = (aeEpollState *)eventLoop->epoll_state;
 
     close(state->epfd);
     free(state->events);
@@ -591,7 +594,7 @@ long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
     // 创建时间事件结构
     aeTimeEvent *te;
 
-    te = malloc(sizeof(*te));
+    te = (aeTimeEvent *)malloc(sizeof(*te));
     if (te == NULL)
         return AE_ERR;
 
