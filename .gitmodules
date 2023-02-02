@@ -7,3 +7,6 @@
 [submodule "third_party/spdk"]
 	path = third_party/spdk
 	url = https://github.com/spdk/spdk
+[submodule "third_party/libco"]
+	path = third_party/libco
+	url = https://github.com/Tencent/libco.git

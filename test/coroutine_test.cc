@@ -1,5 +1,5 @@
 /**
- * TODO: compare to libco
+ * proved that libco is better to use
 */
 #include <gtest/gtest.h>
 
