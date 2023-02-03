@@ -5,6 +5,7 @@ extern "C" {
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 /*
  * 创建一个新的 epoll 实例，并将它赋值给 eventLoop
  */
@@ -161,7 +162,7 @@ aeEventLoop *aeCreateEventLoop(int setsize)
     // 创建事件状态结构
     if ((eventLoop = (aeEventLoop *)malloc(sizeof(*eventLoop))) == NULL)
         goto err;
-
+    memset(eventLoop, 0, sizeof(*eventLoop));
     // 初始化文件事件结构和已就绪文件事件结构数组
     eventLoop->events = (aeFileEvent *)malloc(sizeof(aeFileEvent) * setsize);
     eventLoop->fired = (aeFiredEvent *)malloc(sizeof(aeFiredEvent) * setsize);
@@ -462,6 +463,7 @@ static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop)
  */
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
+    printf("---start processing events\n");
     int processed = 0, numevents;
 
     /* Nothing to do? return ASAP */
@@ -520,6 +522,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         // 1.先处理网络事件，阻塞时间由 tvp 决定
         numevents = aeEpoll(eventLoop, tvp);
+        printf("---%d\n", numevents);
         for (j = 0; j < numevents; j++)
         {
             // 从已就绪数组中获取事件

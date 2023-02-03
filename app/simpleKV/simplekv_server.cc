@@ -1,3 +1,8 @@
+/**
+ * TODO: memtable and db consistency control(may use transaction)
+*/
+
+extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,14 +16,14 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
-
-extern "C" {
 #include "ae.h"
 }
+#include <string>
+#include <unordered_map>
+#include "rocksdb/db.h"
+#include "rocksdb/options.h"
 
 #include "logging.h"
-#include <unordered_map>
-#include <string>
 #include "spinlock.h"
 #include "threadpool.h"
 
@@ -28,6 +33,7 @@ enum {
     kRead,
     kWrite
 };
+const std::string kDBPath{"/tmp/simplekv"};
 
 struct client_data
 {
@@ -47,7 +53,15 @@ struct server
     ThreadPool pool;
     aeEventLoop *ae;
     SpinMutex store_lock;
-    server(size_t back_threads, int max_events): pool(back_threads), ae(aeCreateEventLoop(max_events)) {}
+    rocksdb::DB *db;
+
+    server(size_t back_threads, int max_events): pool(back_threads), ae(aeCreateEventLoop(max_events)) {
+        rocksdb::Options options;
+        options.OptimizeLevelStyleCompaction();
+        options.create_if_missing = true;
+        rocksdb::Status s = rocksdb::DB::Open(options, kDBPath, &db);
+        assert(s.ok());
+    }
 };
 
 server *srv;
@@ -86,22 +100,37 @@ void handle_req(client_data *clientData) {
             goto EXIT;
         }
         srv->store_lock.lock();
-        srv->store[std::string(key)] = std::string(value);
+        srv->store[key] = value;
         srv->store_lock.unlock();
-
-        sprintf(res, "SUCCESS\n");
+        // write through db
+        auto s = srv->db->Put(rocksdb::WriteOptions(), key, value);
+        if(s.ok()) {
+            sprintf(res, "SUCCESS\n");
+        } else {
+            sprintf(res, "FAIL\n");
+        }
+        
     } else if(!strcmp(op, "GET")) {
         if(sscanf(clientData->recvbuf, "%s %s", op, key) < 2) {
             LOG_ERROR("GET FORMAT ERR");
             goto EXIT;
         }
         srv->store_lock.lock();
+        // found in mem
         if(srv->store.find(key) != srv->store.end()) {
             sprintf(res, "%s\n", srv->store[key].c_str());
             srv->store_lock.unlock();
         } else {
             srv->store_lock.unlock();
-            sprintf(res, "FAIL\n");
+            std::string db_res;
+            auto s = srv->db->Get(rocksdb::ReadOptions(), key, &db_res);
+            if(s.ok()) {
+                // found in db
+                sprintf(res, "%s\n", db_res.c_str());
+                srv->store[key] = db_res; // insert into mem
+            } else {
+                sprintf(res, "FAIL\n");
+            }
         }
 
     } else if(!strcmp(op, "DEL")) {
@@ -112,7 +141,12 @@ void handle_req(client_data *clientData) {
         srv->store_lock.lock();
         srv->store.erase(key);
         srv->store_lock.unlock();
-        sprintf(res, "SUCCESS\n");
+        auto s = srv->db->Delete(rocksdb::WriteOptions(), key);
+        if(s.ok()) {
+            sprintf(res, "SUCCESS\n");
+        } else {
+            sprintf(res, "FAIL\n");
+        }
     }
 EXIT:
     memset(clientData->sendbuf, 0, MAX_LINE);
@@ -168,6 +202,7 @@ void writeFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask
 
 void readFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask)
 {
+    LOG_INFO("%d called readFunc", fd);
     int connfd;
     if ((connfd = fd) < 0)
         return;
