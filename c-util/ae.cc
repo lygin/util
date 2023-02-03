@@ -463,7 +463,6 @@ static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop)
  */
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
-    printf("---start processing events\n");
     int processed = 0, numevents;
 
     /* Nothing to do? return ASAP */
@@ -522,7 +521,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         // 1.先处理网络事件，阻塞时间由 tvp 决定
         numevents = aeEpoll(eventLoop, tvp);
-        printf("---%d\n", numevents);
         for (j = 0; j < numevents; j++)
         {
             // 从已就绪数组中获取事件

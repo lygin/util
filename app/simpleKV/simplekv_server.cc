@@ -1,5 +1,6 @@
 /**
  * TODO: memtable and db consistency control(may use transaction)
+ * BUG: cannot poll data
 */
 
 extern "C" {
@@ -27,13 +28,17 @@ extern "C" {
 #include "spinlock.h"
 #include "threadpool.h"
 
-#define PORT 7778
-#define MAX_LINE 2048
+const int PORT = 7778;
+const int MAX_LINE = 2048;
+const int kBackThreads = 4;
+const int kMaxfd = 1024;
+const std::string kDBPath{"/tmp/simplekv"};
+
 enum {
     kRead,
     kWrite
 };
-const std::string kDBPath{"/tmp/simplekv"};
+
 
 struct client_data
 {
@@ -94,7 +99,8 @@ void handle_req(client_data *clientData) {
         LOG_ERROR("NO OP");
         goto EXIT;
     }
-    if(!strcmp(op, "PUT")) {
+    // 增改PUT
+    if(!strcmp(op, "PUT") || !strcmp(op, "put")) {
         if(sscanf(clientData->recvbuf, "%s %s %s", op, key, value) < 3) {
             LOG_ERROR("PUT FORMAT ERR");
             goto EXIT;
@@ -110,7 +116,7 @@ void handle_req(client_data *clientData) {
             sprintf(res, "FAIL\n");
         }
         
-    } else if(!strcmp(op, "GET")) {
+    } else if(!strcmp(op, "GET") || !strcmp(op, "get")) {
         if(sscanf(clientData->recvbuf, "%s %s", op, key) < 2) {
             LOG_ERROR("GET FORMAT ERR");
             goto EXIT;
@@ -133,7 +139,7 @@ void handle_req(client_data *clientData) {
             }
         }
 
-    } else if(!strcmp(op, "DEL")) {
+    } else if(!strcmp(op, "DEL") || !strcmp(op, "del")) {
         if(sscanf(clientData->recvbuf, "%s %s", op, key) < 2) {
             LOG_ERROR("DEL FORMAT ERR");
             goto EXIT;
@@ -229,14 +235,17 @@ void acceptFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mas
             exit(1);
         }
 
-        LOG_INFO("accpet a new client: %s:%d\n", inet_ntoa(cliaddr.sin_addr), cliaddr.sin_port);
+        LOG_INFO("accpet a new client: %s:%d connfd %d\n", inet_ntoa(cliaddr.sin_addr), cliaddr.sin_port, 
+            connfd);
         client_data *clientData = new client_data;
         memset(clientData, 0, sizeof(*clientData));
         clientData->connfd = connfd;
         clientData->cliaddr = cliaddr;
 
         setNonblocking(connfd);
-        aeCreateFileEvent(eventLoop, connfd, AE_READABLE, readFunc, clientData);
+        if(aeCreateFileEvent(eventLoop, connfd, AE_READABLE, readFunc, clientData) != AE_OK) {
+            LOG_INFO("aeCreateFileEvent failed.\n");
+        }
     }
 }
 
@@ -245,7 +254,7 @@ void acceptFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mas
 server *initServer()
 {
     server *psrv;
-    psrv = new server(4, 10);
+    psrv = new server(kBackThreads, kMaxfd);
     return psrv;
 }
 
@@ -255,6 +264,7 @@ int main()
     struct sockaddr_in servaddr;
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
     setNonblocking(listenfd);
+    LOG_INFO("listenfd %d", listenfd);
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);

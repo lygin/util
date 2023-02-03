@@ -58,14 +58,12 @@ void str_cli(int sockfd)
 		printf("> ");
 		if (fgets(sendbuf, MAX_LINE, stdin) == NULL) 
 			break;
-		
 		int n = write(sockfd, sendbuf, strlen(sendbuf));
 		if(n <= 0) {
 			printf("write fail\n");
 			exit(1);
 		}
 		memset(recvbuf, 0, MAX_LINE);
-		printf("RESPONSE:\n");
 		if (readline(sockfd, recvbuf, MAX_LINE) == 0)
 		{
 			perror("server terminated prematurely");
