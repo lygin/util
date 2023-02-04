@@ -49,7 +49,7 @@ struct client_data
     char recvbuf[MAX_LINE];
     // Client status, if no status control, read/write func may trigger many times and do lots of reads and writes
     // Cause the buffer is not immediately retrived by main thread.
-    int status;
+    // int status; (ET mode dont need )
 };
 
 struct server
@@ -199,10 +199,8 @@ void writeFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask
 {
     int connfd;
     client_data *clientDatad = (client_data *)clientData;
-    if(clientDatad->status != kWrite) return;
     if ((connfd = fd) < 0)
         return;
-    clientDatad->status = kRead;
     srv->pool.enqueue(process_write, clientDatad);
 }
 
@@ -213,8 +211,6 @@ void readFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask)
     if ((connfd = fd) < 0)
         return;
     client_data *clientDatad = (client_data *)clientData;
-    if(clientDatad->status != kRead) return;
-    clientDatad->status = kWrite;
     srv->pool.enqueue(process_read, clientDatad);
 }
 

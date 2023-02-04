@@ -6,6 +6,9 @@
 #include <errno.h>
 #include <sys/epoll.h>
 
+// 0 means LT, EPOLLET means ET
+#define ET_MODE EPOLLET
+
 // 成功
 #define AE_OK 0
 // 出错
