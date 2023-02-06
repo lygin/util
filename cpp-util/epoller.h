@@ -162,3 +162,73 @@ class TcpSocket {
   TcpSocket(const TcpSocket&) = delete;
   TcpSocket& operator=(const TcpSocket&) = delete;
 };
+
+class FdObj;
+class HandlerBase {
+ public:
+  virtual ~HandlerBase() {}
+  virtual int HandleRead(FdObj* fd_obj) = 0;
+  virtual int HandleWrite(FdObj* fd_obj) = 0;
+};
+
+class FdObj {
+ private:
+  int fd_;
+
+  HandlerBase* handler_;
+  int events_;
+
+  bool readable_;
+  bool writable_;
+  bool broken_;
+
+ public:
+  static const int kDefaultEvents = EPOLLIN | EPOLLOUT | EPOLLET;
+
+  FdObj(int fd, HandlerBase* handler, int events = kDefaultEvents)
+      : fd_(fd),
+        handler_(handler),
+        events_(events),
+        readable_(false),
+        writable_(false),
+        broken_(false) {}
+
+  virtual ~FdObj() {}
+
+  int fd() { return fd_; }
+
+  int events() { return events_; }
+
+  const bool& readable() { return readable_; }
+  void set_readable(bool readable) { readable_ = readable; }
+  const bool& writable() { return writable_; }
+  void set_writable(bool writable) { writable_ = writable; }
+
+  // Set by callers when the fd would be aborted.
+  const bool& broken() {return broken_; }
+  void set_broken(bool broken) { broken_ = broken; }
+
+  HandlerBase* handler() { return handler_; }
+  void set_handler(HandlerBase *handler) { handler_ = handler; }
+};
+
+class Poller {
+ private:
+  int epoll_fd_;
+
+  uint32_t event_size_;
+  epoll_event* epoll_events_;
+
+ public:
+  static const int kDefaultEventSize = 8096;
+
+  Poller(int events_size = kDefaultEventSize);
+  ~Poller();
+
+  int Add(FdObj* fd_obj);
+  int Remove(FdObj* fd_obj);
+  int RemoveAndCloseFd(FdObj* fd_obj);
+  int Modify(FdObj* fd_obj);
+
+  void RunOnce(int msec);
+};

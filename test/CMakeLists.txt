@@ -38,6 +38,7 @@ add_executable(
   ${cutil}/rte_ring.c
   ${cpputil}/disk_manager.cc
   ${cpputil}/rwlock.cc
+  ${cpputil}/epoller.cc
 )
 
 target_link_libraries(
