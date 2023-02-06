@@ -93,7 +93,7 @@ void readFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask)
 void writeFunc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask);
 
 void handle_req(client_data *clientData) {
-    char res[MAX_LINE] = "INVALID\n";
+    char res[MAX_LINE] = "INVALID";
     char op[MAX_LINE], key[MAX_LINE], value[MAX_LINE];
     if(sscanf(clientData->recvbuf, "%s", op) < 1) {
         LOG_ERROR("NO OP");
@@ -111,9 +111,9 @@ void handle_req(client_data *clientData) {
         // write through db
         auto s = srv->db->Put(rocksdb::WriteOptions(), key, value);
         if(s.ok()) {
-            sprintf(res, "SUCCESS\n");
+            sprintf(res, "SUCCESS");
         } else {
-            sprintf(res, "FAIL\n");
+            sprintf(res, "FAIL");
         }
         
     } else if(!strcmp(op, "GET") || !strcmp(op, "get")) {
@@ -124,7 +124,7 @@ void handle_req(client_data *clientData) {
         srv->store_lock.lock();
         // found in mem
         if(srv->store.find(key) != srv->store.end()) {
-            sprintf(res, "%s\n", srv->store[key].c_str());
+            sprintf(res, "%s", srv->store[key].c_str());
             srv->store_lock.unlock();
         } else {
             srv->store_lock.unlock();
@@ -132,10 +132,10 @@ void handle_req(client_data *clientData) {
             auto s = srv->db->Get(rocksdb::ReadOptions(), key, &db_res);
             if(s.ok()) {
                 // found in db
-                sprintf(res, "%s\n", db_res.c_str());
+                sprintf(res, "%s", db_res.c_str());
                 srv->store[key] = db_res; // insert into mem
             } else {
-                sprintf(res, "FAIL\n");
+                sprintf(res, "FAIL");
             }
         }
 
@@ -149,9 +149,9 @@ void handle_req(client_data *clientData) {
         srv->store_lock.unlock();
         auto s = srv->db->Delete(rocksdb::WriteOptions(), key);
         if(s.ok()) {
-            sprintf(res, "SUCCESS\n");
+            sprintf(res, "SUCCESS");
         } else {
-            sprintf(res, "FAIL\n");
+            sprintf(res, "FAIL");
         }
     }
 EXIT:
