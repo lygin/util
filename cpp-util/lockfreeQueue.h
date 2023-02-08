@@ -9,10 +9,10 @@
 
 #include <atomic>
 #include <cassert>
-#include <cstddef> // offsetof
+#include <cstddef>
 #include <limits>
 #include <memory>
-#include <new> // std::hardware_destructive_interference_size
+#include <new>
 #include <stdexcept>
 
 #ifndef __cpp_aligned_new
