@@ -6,9 +6,15 @@
 #define likely(x) __builtin_expect(!!(x), 1) 
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#define always_inline inline __attribute__((always_inline))
+#define always_inline __always_inline
+
 #define packed __attribute__((__packed__))
-#define aligned(n) __attribute__ ((aligned(n)))
+
+#if __cplusplus > 201103L
+#define ALIGN_AS(n) alignas(n)
+#else
+#define ALIGN_AS(n) __attribute__ ((aligned(n)))
+#endif
 
 static always_inline uint64_t align(uint64_t x, uint64_t base) {
   return (((x) + (base)-1) & ~(base - 1));

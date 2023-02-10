@@ -37,7 +37,6 @@ add_executable(
   ${cutil}/coroutine.c
   ${cutil}/rte_ring.c
   ${cpputil}/disk_manager.cc
-  ${cpputil}/rwlock.cc
   ${cpputil}/epoller.cc
 )
 

@@ -1,4 +1,8 @@
 /*
+ * Usage:
+ * @code{.c}
+ *     #define XXH_INLINE_ALL
+ *     #include "xxhash.h"
  * xxHash - Extremely Fast Hash algorithm
  * Header File
  * Copyright (C) 2012-2021 Yann Collet

@@ -2,6 +2,8 @@
 
 #include <thread>
 #include <map>
+#define XXH_INLINE_ALL
+#include "xxhash.h"
 
 extern "C"
 {
@@ -9,7 +11,7 @@ extern "C"
 #include <pthread.h>
 }
 #include "tars_rwlock.h"
-#include "rwlock.h"
+#include "lock.h"
 
 using namespace std;
 map<int, int> rbtree;
@@ -19,7 +21,7 @@ ngx_atomic_t rwlock;
 pthread_spinlock_t spinlock;
 pthread_rwlock_t prwlock;
 RWLock trwlock;
-Rwlock msk_rwlock;
+RWMutex rocks_rwlock;
 mutex mtx;
 
 void putn()
@@ -117,22 +119,23 @@ void readt()
 	}
 }
 
-void writemsk()
+void writerocks()
 {
 	for (int i = 0; i < N; i++)
 	{
-		msk_rwlock.WLock();
+		rocks_rwlock.WriteLock();
 		rbtree.emplace(i, i);
-		msk_rwlock.Unlock();
+		rocks_rwlock.WriteUnlock();
 	}
 }
-void readmsk()
+
+void readrocks()
 {
 	for (int i = 0; i < N; i++)
 	{
-		msk_rwlock.RLock();
+		rocks_rwlock.ReadLock();
 		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
-		msk_rwlock.Unlock();
+		rocks_rwlock.ReadUnlock();
 	}
 }
 
@@ -201,15 +204,14 @@ TEST(tars_rwlock, rwlock)
 	t1.join();
 	t2.join();
 }
-// TODO: fix bug
-// TEST(msk_rwlock, rwlock)
-// {
-// 	rbtree = map<int, int>();
-// 	thread t1(writemsk);
-// 	thread t2(readmsk);
-// 	t1.join();
-// 	t2.join();
-// }
+TEST(rocks_rwlock, rwlock)
+{
+	rbtree = map<int, int>();
+	thread t1(writerocks);
+	thread t2(readrocks);
+	t1.join();
+	t2.join();
+}
 
 
 TEST(stl_mutex, mutex)
@@ -221,16 +223,80 @@ TEST(stl_mutex, mutex)
 	t2.join();
 }
 
+uint64_t INT_hasher(const int &x) {
+	int temp = x;
+	return XXH3_64bits(&temp, 4);
+}
+Striped<RWMutex, int> striped_rwmutex(128, INT_hasher);
+
+void writestriped()
+{
+	for (int i = 0; i < N; i++)
+	{
+		striped_rwmutex.get(i)->WriteLock();
+		rbtree.emplace(i, i);
+		striped_rwmutex.get(i)->WriteUnlock();
+	}
+}
+
+void readstriped()
+{
+	for (int i = 0; i < N; i++)
+	{
+		striped_rwmutex.get(i)->ReadLock();
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
+		striped_rwmutex.get(i)->ReadUnlock();
+	}
+}
+
+TEST(striped_rwmutex, rwlock) {
+	rbtree = map<int, int>();
+	thread t1(writestriped);
+	thread t2(readstriped);
+	t1.join();
+	t2.join();
+}
+
+Striped<SpinMutex, int> striped_spinmutex(128, INT_hasher);
+
+void writestripedspin()
+{
+	for (int i = 0; i < N; i++)
+	{
+		striped_spinmutex.get(i)->lock();
+		rbtree.emplace(i, i);
+		striped_spinmutex.get(i)->unlock();
+	}
+}
+
+void readstripedspin()
+{
+	for (int i = 0; i < N; i++)
+	{
+		striped_spinmutex.get(i)->lock();
+		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
+		striped_spinmutex.get(i)->unlock();
+	}
+}
+
+TEST(striped_spinmutex, spinlock) {
+	rbtree = map<int, int>();
+	thread t1(writestripedspin);
+	thread t2(readstripedspin);
+	t1.join();
+	t2.join();
+}
+
 /**
  * 结果：
- * ngx_lock.spin_lock (347 ms)
- * ngx_lock.rwlock (256 ms)
- * msk_rwlock.rwlock (230 ms)
- * pthread_lock.spin_lock (261 ms)
- * pthread_lock.rwlock (1225 ms)
- * tars_rwlock.rwlock (494 ms)
- * stl_mutex.mutex (417 ms)
- * 总结：
- * 考虑性能优先使用 msk_rwlock ngx_rwlock pthread_spinlock
- * 考虑CPU占用率优先使用 tars_rwlock stl_mutex/pthread_mutex
+ * ngx_lock.spin_lock (62 ms)
+ * ngx_lock.rwlock (58 ms)
+ * pthread_lock.spin_lock (61 ms)
+ * pthread_lock.rwlock (634 ms)
+ * rocks_rwlock.rwlock (539 ms)
+ * tars_rwlock.rwlock (105 ms)
+ * stl_mutex.mutex (46 ms)
+ * 
+ * striped_rwmutex.rwlock (41 ms)
+ * striped_spinmutex.spinlock (38 ms)
  */

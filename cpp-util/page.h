@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include "rwlock.h"
+#include "lock.h"
 
 constexpr int PAGE_SIZE = 4 << 10; // 4KB
 constexpr int INVALID_PAGE_ID = -1;
@@ -21,11 +21,11 @@ public:
 
     inline bool IsDirty() { return is_dirty_; }
 
-    inline void WLatch() { rwlatch_.WLock(); }
-    inline void WUnlatch() { rwlatch_.Unlock(); }
+    inline void WLatch() { rwlatch_.WriteLock(); }
+    inline void WUnlatch() { rwlatch_.WriteUnlock(); }
 
-    inline void RLatch() { rwlatch_.RLock(); }
-    inline void RUnlatch() { rwlatch_.Unlock(); }
+    inline void RLatch() { rwlatch_.ReadLock(); }
+    inline void RUnlatch() { rwlatch_.ReadUnlock(); }
 
     inline void ResetMemory() { memset(data_, 0, PAGE_SIZE); }
 
@@ -41,5 +41,5 @@ private:
     char data_[PAGE_SIZE]{0};
     uint32_t page_id_ = INVALID_PAGE_ID;
     bool is_dirty_ = false;
-    Rwlock rwlatch_;
+    RWMutex rwlatch_;
 };
