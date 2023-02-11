@@ -26,6 +26,8 @@ public:
     }
     void WritePage(uint32_t page_id, const char *page_data);
     void ReadPage(uint32_t page_id, char *page_data);
+    void Append(const char *buf, size_t size);
+    void Read(char *buf, int off, size_t size);
 
     /**
      * Flush the entire log buffer into disk.
@@ -48,8 +50,9 @@ public:
      * @return the id of the allocated page
      */
     uint32_t AllocatePage() { return next_page_id_++; }
-
-    void DeallocatePage(uint32_t page_id) {}
+    uint32_t MaxPageId() { return next_page_id_ - 1; }
+    uint32_t NextPageId() { return next_page_id_; }
+    void SetNextPageId(uint32_t id) { next_page_id_ = id; }
 
     int GetNumFlushes() const { return num_flushes_; }
 
@@ -66,12 +69,13 @@ public:
     /** Checks if the non-blocking flush future was set. */
     inline bool HasFlushLogFuture() { return flush_log_f_ != nullptr; }
 
-private:
     int GetFileSize(const std::string &file_name) {
         struct stat stat_buf;
         int rc = stat(file_name.c_str(), &stat_buf);
         return rc == 0 ? static_cast<int>(stat_buf.st_size) : -1;
     }
+
+private:
     std::fstream log_io_;
     std::string log_name_;
     std::fstream db_io_;

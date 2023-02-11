@@ -18,6 +18,7 @@ public:
 
     inline char *GetData() { return data_; }
     inline uint32_t GetPageId() { return page_id_; }
+    inline void SetPageId(uint32_t page_id) { page_id_ = page_id; }
 
     inline bool IsDirty() { return is_dirty_; }
 
