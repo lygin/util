@@ -10,7 +10,7 @@ extern "C"
 #include "ngx_lock.h"
 #include <pthread.h>
 }
-#include "tars_rwlock.h"
+#include "rwlock.h"
 #include "lock.h"
 
 using namespace std;
