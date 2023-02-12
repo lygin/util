@@ -56,15 +56,27 @@ class Slice {
   // Return a string that contains the copy of the referenced data.
   std::string ToString() const { return std::string(data_, size_); }
 
-  // Three-way comparison.  Returns value:
-  //   <  0 iff "*this" <  "b",
-  //   == 0 iff "*this" == "b",
-  //   >  0 iff "*this" >  "b"
-  int compare(const Slice& b) const;
+
 
   // Return true iff "x" is a prefix of "*this"
   bool starts_with(const Slice& x) const {
     return ((size_ >= x.size_) && (memcmp(data_, x.data_, x.size_) == 0));
+  }
+
+  // Three-way comparison.  Returns value:
+  //   <  0 iff "*this" <  "b",
+  //   == 0 iff "*this" == "b",
+  //   >  0 iff "*this" >  "b"
+  int compare(const Slice& b) const {
+    const size_t min_len = (size_ < b.size_) ? size_ : b.size_;
+    int r = memcmp(data_, b.data_, min_len);
+    if (r == 0) {
+      if (size_ < b.size_)
+        r = -1;
+      else if (size_ > b.size_)
+        r = +1;
+    }
+    return r;
   }
 
  private:
