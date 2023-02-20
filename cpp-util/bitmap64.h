@@ -9,16 +9,7 @@
 
 class Bitmap64 {
 public:
-  Bitmap64(uint32_t bits) {
-    bits_ = bits;
-    n64_ = (bits + 63) / 64;
-    int rest = bits % 64;
-    printf("%d\n", rest);
-    data_ = (uint64_t*)calloc(n64_, sizeof(uint64_t));
-    if(rest != 0) {
-      data_[n64_-1] = ~0 ^ ((1ull<<rest) - 1);
-    }
-  }
+  Bitmap64() = delete;
   ~Bitmap64() {
     free(data_);
   }
@@ -43,20 +34,20 @@ public:
     return -1;
   }
 
-  bool Test(int index) const {
+  bool Test(uint32_t index) const {
     assert(index < bits_);
     int n = index / 64;
     int off = index % 64;
     return data_[n] & (1ULL << off);
   }
 
-  void Reset(int index) {
+  void Reset(uint32_t index) {
     assert(index < bits_);
     int n = index / 64;
     int off = index % 64;
     data_[n] &= ~(1ULL << off);
   }
-  bool Set(int index) {
+  bool Set(uint32_t index) {
     assert(index < bits_);
     int n = index / 64;
     int off = index % 64;
@@ -68,9 +59,26 @@ public:
   }
 
 private:
+  friend Bitmap64 *NewBitmap64(uint32_t);
   uint32_t bits_; // total bits used
   uint32_t n64_;    // total uint64
-  uint64_t *data_;
+  uint64_t data_[0]; // no ptr wasted
 };
 
+__always_inline Bitmap64 * NewBitmap64(uint32_t bits) {
+  uint32_t n64 = (bits + 63) / 64;
+  int rest = bits % 64;
+  Bitmap64 *bitmap = reinterpret_cast<Bitmap64 *>(malloc(sizeof(Bitmap64) + n64 * sizeof(uint64_t)));
+  bitmap->bits_ = bits;
+  bitmap->n64_ = n64;
+  memset(bitmap->data_, 0, n64 * sizeof(uint64_t));
+  if(rest != 0) {
+      bitmap->data_[n64-1] = ~0 ^ ((1ull<<rest) - 1);
+  }
+  return bitmap;
+}
+
+__always_inline void FreeBitmap64(Bitmap64 *bitmap) {
+  free(bitmap);
+}
 #endif

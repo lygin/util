@@ -3,7 +3,7 @@
 #include "bitmap8.h"
 
 TEST(bitmap64, basic) {
-  Bitmap64 *bitmap = new Bitmap64(56);
+  Bitmap64 *bitmap = NewBitmap64(56);
   
   for(int i=0; i<56; i++) {
     ASSERT_EQ(bitmap->Test(i), 0);
@@ -12,6 +12,7 @@ TEST(bitmap64, basic) {
   ASSERT_EQ(bitmap->Set(1), true);
   ASSERT_EQ(bitmap->Set(3), true);
   ASSERT_EQ(bitmap->FirstFreePos(), 2);
+  FreeBitmap64(bitmap);
 }
 
 TEST(bitmap8, basic) {
