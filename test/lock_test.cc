@@ -5,8 +5,6 @@
 #include "xxhash.h"
 
 #include <pthread.h>
-
-#include "rwlock.h"
 #include "lock.h"
 
 using namespace std;
