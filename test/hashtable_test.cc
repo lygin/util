@@ -12,7 +12,7 @@
 using namespace std;
 
 const int N = 10'0000;
-static const int numThreads = 8;
+static const int numThreads = 4;
 
 std::vector<uint64_t> test_keys(N);
 std::vector<std::string> test_skeys(N);

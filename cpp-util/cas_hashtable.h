@@ -28,7 +28,6 @@ public:
     delete[] list_;
   }
 
-  //返回旧值，如果为null，则旧值不存在
   void Put(uint64_t key, uint64_t value)
   {
     uint64_t hash = XXH3_64bits(&key, sizeof(key));

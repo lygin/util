@@ -5,11 +5,8 @@
 #include <mutex>               // NOLINT
 
 /**
- * @brief 读多写少(>4:1)或临界区大比mutex性能好
- * 考虑性能优先选择 ngx_rwlock(性能是该方法的~200%)，不过此方法CPU占用率较低
- * 写优先
- * 写进入后，会等待之前进入的读者读完
- * 写进入后，后面进入的读者会阻塞
+ * @brief 写抢占
+ * 写进入后，会等待之前进入的读者读完，后面进入的读者会阻塞
  */
 class RWLock {
   using mutex_t = std::mutex;
@@ -82,4 +79,65 @@ class RWLock {
   bool writer_entered_{false};
 };
 
-
+/**
+ * 读写均衡，写会等待所有读锁释放；读会等待写锁释放
+*/
+class CASRWLock {
+  public:
+  CASRWLock(): lock(0) {}
+  void Rlock() {
+    uint64_t i, n;
+    uint64_t old_readers;
+    for ( ;; ) {
+      old_readers = lock;
+      if (old_readers != WLOCK && __sync_bool_compare_and_swap(&lock, old_readers, old_readers + 1)) {
+          return;
+      }
+      for (n = 1; n < SPIN; n <<= 1) {
+        for (i = 0; i < n; i++) {
+            __asm__ ("pause");
+        }
+        old_readers = lock;
+        if (old_readers != WLOCK && __sync_bool_compare_and_swap(&lock, old_readers, old_readers + 1)) {
+            return;
+        }
+      }
+      sched_yield();
+    }
+  }
+  void Wlock() {
+    uint64_t i, n;
+    for ( ;; ) {
+      if (lock == 0 && __sync_bool_compare_and_swap(&lock, 0, WLOCK)) {
+          return;
+      }  
+      for (n = 1; n < SPIN; n <<= 1) {
+        for (i = 0; i < n; i++) {
+            __asm__ ("pause");
+        }
+        if (lock == 0 &&  __sync_bool_compare_and_swap(&lock, 0, WLOCK)) {
+            return;
+        }
+      }
+      sched_yield();
+    }
+  }
+  void Unlock() {
+    uint64_t old_readers;
+    old_readers = lock;
+    if (old_readers == WLOCK) {
+      lock = 0;
+      return;
+    }
+    for ( ;; ) {
+      if (__sync_bool_compare_and_swap(&lock, old_readers, old_readers - 1)) {
+          return;
+      }
+      old_readers = lock;
+    }
+  }
+private:
+  static const uint64_t SPIN = 2048;
+  static const uint64_t WLOCK = ((unsigned long)-1);
+  uint64_t lock;
+};

@@ -2,14 +2,10 @@
 
 #include <thread>
 #include <map>
-#define XXH_INLINE_ALL
 #include "xxhash.h"
 
-extern "C"
-{
-#include "ngx_lock.h"
 #include <pthread.h>
-}
+
 #include "rwlock.h"
 #include "lock.h"
 
@@ -17,31 +13,11 @@ using namespace std;
 map<int, int> rbtree;
 const int N = 10'0000;
 
-ngx_atomic_t rwlock;
+CASRWLock caslock;
 pthread_spinlock_t spinlock;
-pthread_rwlock_t prwlock;
 RWLock trwlock;
 RWMutex rocks_rwlock;
 mutex mtx;
-
-void putn()
-{
-	for (int i = 0; i < N; i++)
-	{
-		ngx_spinlock_lock(&rwlock, 1, 1024);
-		rbtree.emplace(i, i);
-		ngx_spinlock_unlock(&rwlock);
-	}
-}
-void getn()
-{
-	for (int i = 0; i < N; i++)
-	{
-		ngx_spinlock_lock(&rwlock, 1, 1024);
-		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
-		ngx_spinlock_unlock(&rwlock);
-	}
-}
 
 void putp()
 {
@@ -66,39 +42,21 @@ void writen()
 {
 	for (int i = 0; i < N; i++)
 	{
-		ngx_rwlock_wlock(&rwlock);
+		caslock.Wlock();
 		rbtree.emplace(i, i);
-		ngx_rwlock_unlock(&rwlock);
+		caslock.Unlock();
 	}
 }
 void readn()
 {
 	for (int i = 0; i < N; i++)
 	{
-		ngx_rwlock_rlock(&rwlock);
+		caslock.Wlock();
 		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
-		ngx_rwlock_unlock(&rwlock);
+		caslock.Unlock();
 	}
 }
 
-void writep()
-{
-	for (int i = 0; i < N; i++)
-	{
-		pthread_rwlock_wrlock(&prwlock);
-		rbtree.emplace(i, i);
-		pthread_rwlock_unlock(&prwlock);
-	}
-}
-void readp()
-{
-	for (int i = 0; i < N; i++)
-	{
-		pthread_rwlock_rdlock(&prwlock);
-		EXPECT_TRUE(rbtree.find(i) == rbtree.end() || rbtree[i] == i);
-		pthread_rwlock_unlock(&prwlock);
-	}
-}
 
 void writet()
 {
@@ -158,14 +116,6 @@ void readmtx()
 	}
 }
 
-TEST(ngx_lock, spin_lock)
-{
-	rbtree = map<int, int>();
-	thread t1(putn);
-	thread t2(getn);
-	t1.join();
-	t2.join();
-}
 
 TEST(pthread_lock, spin_lock)
 {
@@ -185,17 +135,6 @@ TEST(ngx_lock, rwlock)
 	t1.join();
 	t2.join();
 }
-
-TEST(pthread_lock, rwlock)
-{
-	rbtree = map<int, int>();
-	pthread_rwlock_init(&prwlock, NULL);
-	thread t1(writep);
-	thread t2(readp);
-	t1.join();
-	t2.join();
-}
-
 TEST(tars_rwlock, rwlock)
 {
 	rbtree = map<int, int>();
