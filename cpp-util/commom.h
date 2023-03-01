@@ -20,7 +20,7 @@ static always_inline uint64_t align(uint64_t x, uint64_t base) {
   return (((x) + (base)-1) & ~(base - 1));
 }
 
-static always_inline uint32_t alignUpPowerOf2(uint32_t x) {
+static always_inline uint32_t nextPowerOf2(uint32_t x) {
   x |= x >> 1;
   x |= x >> 2;
   x |= x >> 4;
@@ -29,7 +29,7 @@ static always_inline uint32_t alignUpPowerOf2(uint32_t x) {
   return x + 1;
 }
 
-static always_inline uint64_t alignUpPowerOf2(uint64_t x) {
+static always_inline uint64_t nextPowerOf2(uint64_t x) {
   x |= x >> 1;
   x |= x >> 2;
   x |= x >> 4;

@@ -3,12 +3,16 @@
 #include <unordered_map>
 #include <cstdio>
 #include <random>
+#include <thread>
 #include "ska_hashtable.h"
 #include "unordered_dense_map.h"
+#include "cas_hashtable.h"
 #include "Random.h"
 #include "timer.h"
+using namespace std;
 
 const int N = 10'0000;
+static const int numThreads = 8;
 
 std::vector<uint64_t> test_keys(N);
 std::vector<std::string> test_skeys(N);
@@ -48,10 +52,11 @@ TEST(INIT, INIT)
   printf("reading complete\n");
 }
 
-TEST(ska_hashtable_test, st)
+TEST(ska_hashtable, st_int64)
 {
   /* init table */
   ska::flat_hash_map<uint64_t, uint64_t> ska_table;
+  ska_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -59,7 +64,7 @@ TEST(ska_hashtable_test, st)
     ska_table.emplace(test_keys[i], test_keys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -68,13 +73,14 @@ TEST(ska_hashtable_test, st)
     ASSERT_EQ(ret, test_keys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
 }
 
-TEST(stl_hashtable_test, st)
+TEST(stl_hashtable, st_int64)
 {
   /* init table */
   std::unordered_map<uint64_t, uint64_t> std_table;
+  std_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -82,7 +88,7 @@ TEST(stl_hashtable_test, st)
     std_table.emplace(test_keys[i], test_keys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -91,13 +97,66 @@ TEST(stl_hashtable_test, st)
     ASSERT_EQ(ret, test_keys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n",(double)N/(elapsed/1000.0));
 }
 
-TEST(unordered_dense, st)
+TEST(cas_hashtable, mt_int64_loada) {
+  HashTable ht(N);
+  vector<thread> insertingThreads;
+  vector<thread> searchingThreads;
+  vector<int> failed(numThreads);
+  auto insert = [&ht](int from, int to) {
+	  for(int i=from; i<to; i++) {
+	    ht.Put(test_keys[i], test_keys[i]);
+	  }
+  };
+  auto search = [&ht, &failed](int from, int to, int tid){
+	  int fail = 0;
+	  for(int i=from; i<to; i++){
+      uint64_t value;
+	    bool ret = ht.Get(test_keys[i], value);
+	    if(ret == false || value != test_keys[i]){
+		    fail++;
+	    }
+	  }
+	  failed[tid] = fail;
+  };
+  const size_t chunk = N/numThreads;
+  clear_cache();
+  Timer t;
+  for(int i=0; i<numThreads; i++){
+    if(i != numThreads-1)
+      insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1)));
+    else 
+      insertingThreads.emplace_back(thread(insert, chunk*i, N));
+  }
+  for(auto& t: insertingThreads) t.join();
+  double elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
+
+
+  clear_cache();
+  t.Reset();
+  for(int i=0; i<numThreads; i++){
+	  if(i != numThreads-1)
+	    searchingThreads.emplace_back(thread(search, chunk*i, chunk*(i+1), i));
+	  else
+	    searchingThreads.emplace_back(thread(search, chunk*i, N, i));
+  }
+  for(auto& t: searchingThreads) t.join();
+  elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  int failedSearch = 0;
+  for(auto& v: failed) failedSearch += v;
+  cout << failedSearch << " failedSearch" << "\n";
+  assert(failedSearch == 0);
+}
+
+TEST(unordered_dense, st_int64)
 {
   /* init table */
   ankerl::unordered_dense::map<uint64_t, uint64_t> ank_table;
+  ank_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -105,7 +164,7 @@ TEST(unordered_dense, st)
     ank_table.emplace(test_keys[i], test_keys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -114,13 +173,14 @@ TEST(unordered_dense, st)
     ASSERT_EQ(ret, test_keys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
 }
 
-TEST(ska_hashtable_test, st_string)
+TEST(ska_hashtable, st_string)
 {
   /* init table */
   ska::flat_hash_map<std::string, std::string> ska_table;
+  ska_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -128,7 +188,7 @@ TEST(ska_hashtable_test, st_string)
     ska_table.emplace(test_skeys[i], test_skeys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -137,13 +197,14 @@ TEST(ska_hashtable_test, st_string)
     ASSERT_EQ(ret, test_skeys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
 }
 
-TEST(stl_hashtable_test, st_string)
+TEST(stl_hashtable, st_string)
 {
   /* init table */
   std::unordered_map<std::string, std::string> ska_table;
+  ska_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -151,7 +212,7 @@ TEST(stl_hashtable_test, st_string)
     ska_table.emplace(test_skeys[i], test_skeys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -160,13 +221,14 @@ TEST(stl_hashtable_test, st_string)
     ASSERT_EQ(ret, test_skeys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
 }
 
 TEST(unordered_dense, st_string)
 {
   /* init table */
   ankerl::unordered_dense::map<std::string, std::string> ska_table;
+  ska_table.reserve(N);
   clear_cache();
   Timer t;
   for (int i = 0; i < N; ++i)
@@ -174,7 +236,7 @@ TEST(unordered_dense, st_string)
     ska_table.emplace(test_skeys[i], test_skeys[i]);
   }
   double elapsed = t.GetDurationNs();
-  printf("Insertion elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
   
   clear_cache();
   t.Reset();
@@ -183,7 +245,7 @@ TEST(unordered_dense, st_string)
     ASSERT_EQ(ret, test_skeys[i]);
   }
   elapsed = t.GetDurationNs();
-  printf("Search elapsed: %.3f us %f Mops\n", elapsed/1000, (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
 }
 
 /**
