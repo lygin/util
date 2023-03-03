@@ -14,7 +14,7 @@
 #include "cuckoomap/cuckoohash_map.hh"
 using namespace std;
 
-const int N = 10'0000;
+const int N = 200'000;
 static const int numThreads = 8;
 
 std::vector<uint64_t> test_keys(N);
@@ -202,7 +202,7 @@ TEST(unordered_dense, st_string)
 TEST(tbb_conhashtable, mt_int64_loadc) {
   using namespace tbb;
   using namespace std;
-  concurrent_hash_map<uint64_t, uint64_t> ht;
+  concurrent_hash_map<uint64_t, uint64_t> ht(65536);
   vector<thread> insertingThreads;
   vector<thread> searchingThreads;
   vector<int> failed(numThreads);
@@ -248,7 +248,7 @@ TEST(tbb_conhashtable, mt_int64_loadc) {
   }
   for(auto& t: searchingThreads) t.join();
   elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
   int failedSearch = 0;
   for(auto& v: failed) failedSearch += v;
   cout << failedSearch << " failedSearch" << "\n";
@@ -300,7 +300,7 @@ TEST(cas_hashtable, mt_int64_loadc) {
   }
   for(auto& t: searchingThreads) t.join();
   elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
   int failedSearch = 0;
   for(auto& v: failed) failedSearch += v;
   cout << failedSearch << " failedSearch" << "\n";
@@ -353,7 +353,7 @@ TEST(CLHT_lb, mt_int64_loadc) {
   }
   for(auto& t: searchingThreads) t.join();
   elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
   int failedSearch = 0;
   for(auto& v: failed) failedSearch += v;
   cout << failedSearch << " failedSearch" << "\n";
@@ -361,7 +361,7 @@ TEST(CLHT_lb, mt_int64_loadc) {
 }
 
 TEST(cuckoo_hashmap, mt_int64_loadc) {
-  libcuckoo::cuckoohash_map<uint64_t, uint64_t> ht;
+  libcuckoo::cuckoohash_map<uint64_t, uint64_t> ht(65536);
   vector<thread> insertingThreads;
   vector<thread> searchingThreads;
   vector<int> failed(numThreads);
@@ -405,7 +405,7 @@ TEST(cuckoo_hashmap, mt_int64_loadc) {
   }
   for(auto& t: searchingThreads) t.join();
   elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
   int failedSearch = 0;
   for(auto& v: failed) failedSearch += v;
   cout << failedSearch << " failedSearch" << "\n";
@@ -427,4 +427,7 @@ TEST(cuckoo_hashmap, mt_int64_loadc) {
  * 总结：
  * for int64: ska or ankerl
  * for string: ankerl
+ * --------------------
+ * 8 threads: uint64->uint64
+ * clht = cas > cuckoo > tbb
  */
