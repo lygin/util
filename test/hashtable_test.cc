@@ -11,6 +11,7 @@
 #include "Random.h"
 #include "timer.h"
 #include "clht.h"
+#include "cuckoomap/cuckoohash_map.hh"
 using namespace std;
 
 const int N = 10'0000;
@@ -100,58 +101,6 @@ TEST(stl_hashtable, st_int64)
   }
   elapsed = t.GetDurationNs();
   printf("Search %f Mops\n",(double)N/(elapsed/1000.0));
-}
-
-TEST(cas_hashtable, mt_int64_loadc) {
-  HashTable ht(N);
-  vector<thread> insertingThreads;
-  vector<thread> searchingThreads;
-  vector<int> failed(numThreads);
-  auto insert = [&ht](int from, int to) {
-	  for(int i=from; i<to; i++) {
-	    ht.Put(test_keys[i], test_keys[i]);
-	  }
-  };
-  auto search = [&ht, &failed](int from, int to, int tid){
-	  int fail = 0;
-	  for(int i=from; i<to; i++){
-      uint64_t value;
-	    bool ret = ht.Get(test_keys[i], value);
-	    if(ret == false || value != test_keys[i]){
-		    fail++;
-	    }
-	  }
-	  failed[tid] = fail;
-  };
-  const size_t chunk = N/numThreads;
-  clear_cache();
-  Timer t;
-  for(int i=0; i<numThreads; i++){
-    if(i != numThreads-1)
-      insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1)));
-    else 
-      insertingThreads.emplace_back(thread(insert, chunk*i, N));
-  }
-  for(auto& t: insertingThreads) t.join();
-  double elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
-
-
-  clear_cache();
-  t.Reset();
-  for(int i=0; i<numThreads; i++){
-	  if(i != numThreads-1)
-	    searchingThreads.emplace_back(thread(search, chunk*i, chunk*(i+1), i));
-	  else
-	    searchingThreads.emplace_back(thread(search, chunk*i, N, i));
-  }
-  for(auto& t: searchingThreads) t.join();
-  elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
-  int failedSearch = 0;
-  for(auto& v: failed) failedSearch += v;
-  cout << failedSearch << " failedSearch" << "\n";
-  assert(failedSearch == 0);
 }
 
 TEST(unordered_dense, st_int64)
@@ -306,6 +255,58 @@ TEST(tbb_conhashtable, mt_int64_loadc) {
   assert(failedSearch == 0);
 }
 
+TEST(cas_hashtable, mt_int64_loadc) {
+  HashTable ht(N);
+  vector<thread> insertingThreads;
+  vector<thread> searchingThreads;
+  vector<int> failed(numThreads);
+  auto insert = [&ht](int from, int to) {
+	  for(int i=from; i<to; i++) {
+	    ht.Put(test_keys[i], test_keys[i]);
+	  }
+  };
+  auto search = [&ht, &failed](int from, int to, int tid){
+	  int fail = 0;
+	  for(int i=from; i<to; i++){
+      uint64_t value;
+	    bool ret = ht.Get(test_keys[i], value);
+	    if(ret == false || value != test_keys[i]){
+		    fail++;
+	    }
+	  }
+	  failed[tid] = fail;
+  };
+  const size_t chunk = N/numThreads;
+  clear_cache();
+  Timer t;
+  for(int i=0; i<numThreads; i++){
+    if(i != numThreads-1)
+      insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1)));
+    else 
+      insertingThreads.emplace_back(thread(insert, chunk*i, N));
+  }
+  for(auto& t: insertingThreads) t.join();
+  double elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
+
+
+  clear_cache();
+  t.Reset();
+  for(int i=0; i<numThreads; i++){
+	  if(i != numThreads-1)
+	    searchingThreads.emplace_back(thread(search, chunk*i, chunk*(i+1), i));
+	  else
+	    searchingThreads.emplace_back(thread(search, chunk*i, N, i));
+  }
+  for(auto& t: searchingThreads) t.join();
+  elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  int failedSearch = 0;
+  for(auto& v: failed) failedSearch += v;
+  cout << failedSearch << " failedSearch" << "\n";
+  assert(failedSearch == 0);
+}
+
 TEST(CLHT_lb, mt_int64_loadc) {
   clht_t* ht = clht_create(65536);
   vector<thread> insertingThreads;
@@ -336,6 +337,58 @@ TEST(CLHT_lb, mt_int64_loadc) {
       insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1), i));
     else 
       insertingThreads.emplace_back(thread(insert, chunk*i, N, i));
+  }
+  for(auto& t: insertingThreads) t.join();
+  double elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
+
+
+  clear_cache();
+  t.Reset();
+  for(int i=0; i<numThreads; i++){
+	  if(i != numThreads-1)
+	    searchingThreads.emplace_back(thread(search, chunk*i, chunk*(i+1), i));
+	  else
+	    searchingThreads.emplace_back(thread(search, chunk*i, N, i));
+  }
+  for(auto& t: searchingThreads) t.join();
+  elapsed = t.GetDurationNs();
+  printf("Insertion %f Mops\n", (double)N/(elapsed/1000.0));
+  int failedSearch = 0;
+  for(auto& v: failed) failedSearch += v;
+  cout << failedSearch << " failedSearch" << "\n";
+  assert(failedSearch == 0);
+}
+
+TEST(cuckoo_hashmap, mt_int64_loadc) {
+  libcuckoo::cuckoohash_map<uint64_t, uint64_t> ht;
+  vector<thread> insertingThreads;
+  vector<thread> searchingThreads;
+  vector<int> failed(numThreads);
+  auto insert = [&ht](int from, int to) {
+	  for(int i=from; i<to; i++) {
+	    ht.insert(test_keys[i], test_keys[i]);
+	  }
+  };
+  auto search = [&ht, &failed](int from, int to, int tid){
+	  int fail = 0;
+	  for(int i=from; i<to; i++){
+      uint64_t value;
+      int ret = ht.find(test_keys[i], value);
+	    if(ret == false || value != test_keys[i]){
+		    fail++;
+	    }
+	  }
+	  failed[tid] = fail;
+  };
+  const size_t chunk = N/numThreads;
+  clear_cache();
+  Timer t;
+  for(int i=0; i<numThreads; i++){
+    if(i != numThreads-1)
+      insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1)));
+    else 
+      insertingThreads.emplace_back(thread(insert, chunk*i, N));
   }
   for(auto& t: insertingThreads) t.join();
   double elapsed = t.GetDurationNs();
