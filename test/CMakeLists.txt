@@ -25,7 +25,9 @@ enable_testing()
 
 set(cutil ../c-util)
 set(cpputil ../cpp-util)
-include_directories(${cutil} ${cpputil})
+set(CLHT_DIR ../third_party/CLHT)
+link_directories(${CLHT_DIR} ${CLHT_DIR}/external/lib)
+include_directories(${cutil} ${cpputil} ${CLHT_DIR}/include)
 
 aux_source_directory(. src)
 
@@ -43,6 +45,9 @@ add_executable(
 target_link_libraries(
   test_main
   GTest::gtest_main
+  tbb
+  clht
+  ssmem
 )
 
 include(GoogleTest)

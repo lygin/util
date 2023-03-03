@@ -10,3 +10,6 @@
 [submodule "third_party/libco"]
 	path = third_party/libco
 	url = https://github.com/Tencent/libco.git
+[submodule "third_party/CLHT"]
+	path = third_party/CLHT
+	url = https://github.com/LPD-EPFL/CLHT

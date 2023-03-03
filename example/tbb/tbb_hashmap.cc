@@ -1,6 +1,7 @@
 #include "tbb/concurrent_hash_map.h"
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_for.h"
+#include "Random.h"
 #include <string>
 
 using namespace tbb;
@@ -27,9 +28,9 @@ typedef concurrent_hash_map<string,int,MyHashCompare> StringTable;
 
 
 // Function object for counting occurrences of strings.
-struct Tally {
+struct Counter {
     StringTable& table;
-    Tally( StringTable& table_ ) : table(table_) {}
+    Counter( StringTable& table_ ) : table(table_) {}
     void operator()( const blocked_range<string*> range ) const {
         for( string* p=range.begin(); p!=range.end(); ++p ) {
             StringTable::accessor a;
@@ -39,21 +40,19 @@ struct Tally {
     }
 };
 
-
 const size_t N = 1000000;
-
-
 string Data[N];
-
 
 int main() {
     // Construct empty table.
     StringTable table;
-
-
+    RandomRng rand(0, 10);
+    for(int i=0; i<N; ++i) {
+        Data[i] = to_string(rand.rand());
+    }
+    blocked_range<string*> splitData(Data, Data+N, 1000);
     // Put occurrences into the table
-    parallel_for( blocked_range<string*>( Data, Data+N, 1000 ),
-                  Tally(table) );
+    parallel_for(splitData, Counter(table) );
 
 
     // Display the occurrences
