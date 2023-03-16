@@ -10,5 +10,8 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_executable(hello hello_world.cc)
-target_link_libraries(hello pmemobj)
+add_executable(apmemobj libpmemobj.cc)
+target_link_libraries(apmemobj pmemobj)
+
+add_executable(bpmem libpmem.cc)
+target_link_libraries(bpmem pmem)
