@@ -5,6 +5,7 @@
 #include <list>
 #include <unordered_map>
 
+// lru policy just store key's order in the list
 template <typename Key>
 class LRUCachePolicy : public ICachePolicy<Key>
 {
@@ -37,16 +38,6 @@ public:
   const Key &ReplCandidate() const override
   {
     return lru_queue.back();
-  }
-
-  size_t SumMinHits(uint64_t num_elements) override
-  {
-    return 0;
-  }
-
-  size_t Hits(const Key &key) override
-  {
-    return 0;
   }
 
 private:

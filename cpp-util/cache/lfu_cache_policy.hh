@@ -20,8 +20,7 @@ public:
   {
     constexpr std::size_t INIT_VAL = 1;
     // all new value initialized with the frequency 1
-    lfu_storage[key] = frequency_storage.emplace_hint(
-        frequency_storage.cbegin(), INIT_VAL, key);
+    lfu_storage[key] = frequency_storage.emplace_hint(requency_storage.cbegin(), INIT_VAL, key);
   }
 
   void Touch(const Key &key) override
@@ -74,7 +73,7 @@ public:
   }
 
 private:
-  std::multimap<std::size_t, Key> frequency_storage;
+  std::multimap<std::size_t, Key> frequency_storage;//ordered by frequency
   std::unordered_map<Key, lfu_iterator> lfu_storage;
 };
 

@@ -348,7 +348,7 @@ private:
   static uint32_t Shard(uint32_t hash) { return hash >> (32 - kNumShardBits); }
 
 public:
-  explicit ShardedLRUCache(size_t capacity, function<void(const Slice&, void* value)> deleter)
+  explicit ShardedLRUCache(size_t capacity, function<void(const Slice&, void*)> deleter=[](const Slice&, void* ){})
   {
     const size_t per_shard = (capacity + (kNumShards - 1)) / kNumShards;
     for (int s = 0; s < kNumShards; s++)
@@ -362,7 +362,6 @@ public:
   LRUEntry *Insert(const Slice &key, void *value)
   {
     const uint32_t hash = HashSlice(key);
-    // printf("Insert Page %d Hash %d\n", *(uint32_t*)key.data(), hash);
     return shard_[Shard(hash)].Insert(key, hash, value);
   }
   LRUEntry *Lookup(const Slice &key)
@@ -378,12 +377,7 @@ public:
   void Erase(const Slice &key)
   {
     const uint32_t hash = HashSlice(key);
-    // printf("Remove Page %d Hash %d\n", *(uint32_t*)key.data(), hash);
     shard_[Shard(hash)].Erase(key, hash);
-  }
-  void *Value(LRUEntry *handle)
-  {
-    return handle->value;
   }
   void Prune()
   {
@@ -403,4 +397,6 @@ public:
   }
 };
 
-using LruCache = ShardedLRUCache;
+using SLruCache = ShardedLRUCache;
+
+#define HandleValue(handle) ((handle)->value)

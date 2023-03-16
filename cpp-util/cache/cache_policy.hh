@@ -20,11 +20,6 @@ public:
 
   // return a key of a replacement candidate
   virtual const Key &ReplCandidate() const = 0;
-
-  virtual size_t SumMinHits(uint64_t num_elements) = 0;
-
-  virtual size_t Hits(const Key &key) = 0;
-
 };
 
 template <typename Key>

@@ -15,11 +15,9 @@ class fixed_sized_cache
 {
 public:
   using iterator = typename std::unordered_map<Key, Value>::iterator;
-  using const_iterator =
-      typename std::unordered_map<Key, Value>::const_iterator;
+  using const_iterator = typename std::unordered_map<Key, Value>::const_iterator;
   using operation_guard = typename std::lock_guard<std::mutex>;
-  using Callback =
-      typename std::function<void(const Key &key, const Value &value)>;
+  using Callback = typename std::function<void(const Key &key, const Value &value)>;
 
   explicit fixed_sized_cache(size_t max_size,
       Callback OnErase = [](const Key &, const Value &) {},
@@ -142,6 +140,7 @@ protected:
   {
     cache_policy.Erase(key);
     auto elem_it = FindElem(key);
+    //usful when value is pointer which need to be released
     //OnEraseCallback(key, elem_it->second);
     cache_items_map.erase(elem_it);
     return elem_it;
@@ -149,6 +148,7 @@ protected:
 
   void Update(const Key &key, const Value &value)
   {
+    //update do not touch key
     //cache_policy.Touch(key);
     cache_items_map[key] = value;
   }
@@ -159,7 +159,7 @@ protected:
   }
 
 private:
-  std::unordered_map<Key, Value> cache_items_map;
+  std::unordered_map<Key, Value> cache_items_map; //all data is store in hashmap
   mutable Policy cache_policy;
   mutable std::mutex safe_op;
   size_t max_cache_size;
