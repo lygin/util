@@ -104,4 +104,25 @@ class Arena : public Allocator {
   std::atomic<size_t> memory_usage_;
 };
 
+class FixedArena : public Arena {
+  public:
+  FixedArena(int32_t item_size): fixed_size_(item_size) {}
+  ~FixedArena() = default;
+  void FreeFixed(char* ptr) {
+    free_list_.push_back(ptr);
+  }
+  char *AllocateFixed(size_t bytes) {
+    assert(bytes == fixed_size_);
+    if(free_list_.size()) {
+      char *ret = free_list_.back();
+      free_list_.pop_back();
+      return ret;
+    }
+    return AllocateAligned(bytes);
+  }
+  private:
+  std::vector<char*> free_list_;
+  int32_t fixed_size_;
+};
+
 #endif  // _ARENA_H_
