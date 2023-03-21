@@ -28,9 +28,9 @@ class CacheTest : public testing::Test {
   static constexpr int kCacheSize = 1000;
   std::vector<int> deleted_keys_;
   std::vector<int> deleted_values_;
-  LruCache* cache_;
+  SLruCache* cache_;
 
-  CacheTest() : cache_(new LruCache(kCacheSize, Deleter)) { 
+  CacheTest() : cache_(new SLruCache(kCacheSize, Deleter)) { 
       current_ = this; 
   }
 
@@ -38,7 +38,7 @@ class CacheTest : public testing::Test {
 
   int Lookup(int key) {
     LRUEntry* handle = cache_->Lookup(EncodeKey(key));
-    const int r = (handle == nullptr) ? -1 : DecodeValue(cache_->Value(handle));
+    const int r = (handle == nullptr) ? -1 : DecodeValue(HandleValue(handle));
     if (handle != nullptr) {
       cache_->Release(handle);
     }
@@ -104,11 +104,11 @@ TEST_F(CacheTest, Erase) {
 TEST_F(CacheTest, EntriesArePinned) {
   Insert(100, 101);
   LRUEntry* h1 = cache_->Lookup(EncodeKey(100));
-  ASSERT_EQ(101, DecodeValue(cache_->Value(h1)));
+  ASSERT_EQ(101, DecodeValue(HandleValue(h1)));
 
   Insert(100, 102);
   LRUEntry* h2 = cache_->Lookup(EncodeKey(100));
-  ASSERT_EQ(102, DecodeValue(cache_->Value(h2)));
+  ASSERT_EQ(102, DecodeValue(HandleValue(h2)));
   ASSERT_EQ(0, deleted_keys_.size());
 
   cache_->Release(h1);

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "bloomfilter.h"
+#include "bloom.h"
 #include <memory>
 using namespace std;
 
@@ -27,4 +28,18 @@ TEST(bloomfilter, basic) {
   EXPECT_EQ(bf->KeyMayMatch("xxZ", filter), true);
   EXPECT_EQ(bf->KeyMayMatch("xxa", filter), false);
   EXPECT_EQ(bf->KeyMayMatch("xxz", filter), false);
+}
+
+TEST(bloom, basic) {
+  Bloom bf;
+  bf.Init(1000, 0.01);
+  for(int i=0; i<100; ++i) {
+    EXPECT_EQ(bf.Add(&i, 4), BloomStatus::OK);
+  }
+  for(int i=0; i<100; ++i) {
+    EXPECT_EQ(bf.Check(&i, 4), BloomStatus::kMayExist);
+  }
+  for(int i=100; i<1000; ++i) {
+    EXPECT_EQ(bf.Check(&i, 4), BloomStatus::kNotExist);
+  }
 }
