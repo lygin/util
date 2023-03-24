@@ -13,3 +13,6 @@
 [submodule "third_party/CLHT"]
 	path = third_party/CLHT
 	url = https://github.com/LPD-EPFL/CLHT
+[submodule "third_party/FlameGraph"]
+	path = third_party/FlameGraph
+	url = git@github.com:brendangregg/FlameGraph.git

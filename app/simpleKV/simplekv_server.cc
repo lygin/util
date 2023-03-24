@@ -25,7 +25,7 @@ extern "C" {
 #include "rocksdb/options.h"
 
 #include "logging.h"
-#include "spinlock.h"
+#include "lock.h"
 #include "threadpool.h"
 
 const int PORT = 7778;
