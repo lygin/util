@@ -15,6 +15,10 @@ set(cpputil ../../cpp-util)
 
 
 include_directories(${cutil} ${cpputil})
-aux_source_directory(. SRC)
-add_executable(tmp ${SRC})
-target_link_libraries(tmp pthread)
+add_executable(mts
+mw_to_sw.cc
+)
+add_executable(heap
+simple_heap.cc
+)
+target_link_libraries(mts pthread)
