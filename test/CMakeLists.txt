@@ -34,7 +34,6 @@ aux_source_directory(. src)
 add_executable(
   test_main
   ${src}
-  ${cutil}/adlist.c
   ${cutil}/ngx_lock.c
   ${cutil}/coroutine.c
   ${cutil}/rte_ring.c

@@ -10,7 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <vector>
+#include <queue>
 
 class Allocator {
  public:
@@ -109,19 +109,19 @@ class FixedArena : public Arena {
   FixedArena(int32_t item_size): fixed_size_(item_size) {}
   ~FixedArena() = default;
   void FreeFixed(char* ptr) {
-    free_list_.push_back(ptr);
+    free_list_.push(ptr);
   }
-  char *AllocateFixed(size_t bytes) {
+  char *AllocateFixed(int32_t bytes) {
     assert(bytes == fixed_size_);
     if(free_list_.size()) {
-      char *ret = free_list_.back();
-      free_list_.pop_back();
+      char *ret = free_list_.front();
+      free_list_.pop();
       return ret;
     }
     return AllocateAligned(bytes);
   }
   private:
-  std::vector<char*> free_list_;
+  std::queue<char*> free_list_;
   int32_t fixed_size_;
 };
 

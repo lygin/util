@@ -50,3 +50,37 @@ TEST(ArenaTest, Simple) {
     }
   }
 }
+
+TEST(FixedArenaTest, AllocateAndFreeFixed) {
+  const int32_t item_size = 16;
+  const int32_t num_items = 10;
+  FixedArena arena(item_size);
+
+  // Allocate fixed-size chunks of memory
+  char *ptrs[num_items];
+  for (int i = 0; i < num_items; ++i) {
+    ptrs[i] = arena.AllocateFixed(item_size);
+    EXPECT_TRUE(ptrs[i] != nullptr);
+  }
+
+  // Try to allocate a chunk of memory that is too large
+  // char *ptr = arena.AllocateFixed(item_size + 1);
+  // EXPECT_TRUE(ptr == nullptr);
+
+  // Free some of the fixed-size chunks of memory
+  arena.FreeFixed(ptrs[0]);
+  arena.FreeFixed(ptrs[2]);
+  arena.FreeFixed(ptrs[4]);
+
+  // Allocate more fixed-size chunks of memory
+  char *ptrs2[3];
+  for (int i = 0; i < 3; ++i) {
+    ptrs2[i] = arena.AllocateFixed(item_size);
+    EXPECT_TRUE(ptrs2[i] != nullptr);
+  }
+
+  // Check that the same chunks of memory were reused
+  EXPECT_EQ(ptrs[0], ptrs2[0]);
+  EXPECT_EQ(ptrs[2], ptrs2[1]);
+  EXPECT_EQ(ptrs[4], ptrs2[2]);
+}
