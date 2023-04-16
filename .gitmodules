@@ -16,3 +16,6 @@
 [submodule "third_party/FlameGraph"]
 	path = third_party/FlameGraph
 	url = git@github.com:brendangregg/FlameGraph.git
+[submodule "third_party/libgo"]
+	path = third_party/libgo
+	url = https://github.com/yyzybb537/libgo

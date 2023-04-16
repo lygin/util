@@ -1,13 +1,11 @@
 /**
- * @brief   nginx采用slab方法管理共享内存,即可以将一页内存分割成多个大小相等的内存块,
+ * @brief
+ * 将一页内存分割成多个大小相等的内存块,
  * 不同的页分割出来的内存块大小可以不同.我们把页面叫做page,用m_page数组管理page页面;
- * 一页分割出来的内存块叫做slot,用m_slot数组管理slot块.这里的m_slot表示manage slot,
- * 意思是管理slot;m_page表示managepage,寓意管理page.而page数组表示真正用于存储数据的内存,
- * m_slot和m_page都是用于管理内存的.
+ * 一页分割出来的内存块叫做slot,用m_slot数组管理slot块.这里的m_slot表示manage slot
  *
  * nginx的slab方法对于内存的管理分为两级,页面管理一级,即m_page数组,slot块管理一级,
  * 用于管理page页面分割的slot块.
- * @ref https://blog.csdn.net/qifengzou/article/details/11678115
  */
 #include <sys/types.h>
 #include "logging.h"
@@ -25,13 +23,8 @@ typedef unsigned char u_char;
 
 struct ngx_slab_page_s
 {
-    // 会使用bitmap来标记page页面中的slot块是否使用.并将位图存储在slab中.slab是32为整形变量,即对应32块slot.
-    // 1.当page划分的slot大于32块(slot<128B时)就无法用slab存储了,这时候,我们使用page页面中的最前面几块slot来存储位图.
-    // slab用于存储slot块大小的位移.
-    // 2.如果obj移位大小为ngx_slab_exact_shift，也就是obj128字节，page->slab = 1;page->slab存储obj的bitmap
-    // 3.如果obj移位大小为ngx_slab_exact_shift，也就是obj>128字节，4K最多也就16个256，因此只需要slab的高16位表示obj位图即可
-
-    uintptr_t slab; // ngx_slab_init中初始赋值为共享内存中剩余页的个数
+    // 使用bitmap来标记page页面中的slot块是否使用.并将位图存储在slab中.slab是32为整形变量,即对应32块slot.
+    uintptr_t slab;
     // 9个ngx_slab_page_s通过next连接在一起
     // 如果页中的ojb<128 = 128 或者>128 ,则next直接指向对应的页slots[slot].next = page; 同时pages_m[]指向page->next = &slots[slot];
     ngx_slab_page_t *next; // 在分配较小obj的时候，next指向下一个page页

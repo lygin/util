@@ -45,8 +45,6 @@ static ngx_uint_t ngx_slab_exact_shift; // ngx_slab_exact_shift = 7，即128的�
 ，这样会造成一定的空间损失。等于或大于128B的obj因为可以用一个32bit的整形来表示其状态，所以就可以直接用slab成员。每次分配 的空间是2^n，
 最小是8byte，8，16，32，64，128，256，512，1024，2048。小于2^i且大于2^(i-1)的obj会被分 配一个2^i的空间，比如56byte的obj就会分配一个64byte的空间。
 */
-
-// 图形化理解参考:https://blog.csdn.net/qifengzou/article/details/11678115
 void ngx_slab_init(ngx_slab_pool_t *pool)
 {
     u_char *p;
