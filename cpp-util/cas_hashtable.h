@@ -5,7 +5,6 @@
 #include <atomic>
 #include "xxhash.h"
 #include "commom.h"
-#include "arena.h"
 using namespace std;
 
 
@@ -66,5 +65,4 @@ private:
   uint32_t capacity_; // capacity
   uint32_t size_;  // size
   Bucket **list_; // hashtable
-  Arena arena_;
 };
