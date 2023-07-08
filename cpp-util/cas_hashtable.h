@@ -5,6 +5,7 @@
 #include <atomic>
 #include "xxhash.h"
 #include "commom.h"
+#include "arena.h"
 using namespace std;
 
 
@@ -36,8 +37,8 @@ public:
     newbucket->key = key;
     newbucket->value = value;
     while(true) {
+      newbucket->next_bucket = list_[bucket_no];
       Bucket *old_head = list_[bucket_no];
-      newbucket->next_bucket = old_head;
       if(__sync_bool_compare_and_swap(&list_[bucket_no], old_head, newbucket)) {
         break;
       }
@@ -65,4 +66,5 @@ private:
   uint32_t capacity_; // capacity
   uint32_t size_;  // size
   Bucket **list_; // hashtable
+  Arena arena_;
 };

@@ -196,6 +196,7 @@ class FdObj {
   virtual ~FdObj() {}
 
   int fd() { return fd_; }
+  void set_fd(int fd) { fd_ = fd; }
 
   int events() { return events_; }
 

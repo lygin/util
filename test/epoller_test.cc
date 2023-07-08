@@ -43,13 +43,13 @@ TEST(PollerTest, Basic) {
 
   InetAddr addr1("127.0.0.1", 13768);
 
-  TcpSocket tcp1;
-  ASSERT_EQ(tcp1.InitSocket(), 0);
-  ASSERT_EQ(tcp1.Bind(addr1), 0);
-  ASSERT_EQ(tcp1.Listen(), 0);
-  std::cout << tcp1.ToString() << std::endl;
+  TcpSocket svr;
+  ASSERT_EQ(svr.InitSocket(), 0);
+  ASSERT_EQ(svr.Bind(addr1), 0);
+  ASSERT_EQ(svr.Listen(), 0);
+  std::cout << svr.ToString() << std::endl;
 
-  ASSERT_TRUE(tcp1.listened());
+  ASSERT_TRUE(svr.listened());
 
   TcpSocket client;
   InetAddr addr2("127.0.0.1", 13769);
@@ -59,7 +59,7 @@ TEST(PollerTest, Basic) {
   std::cout << client.ToString() << std::endl;
 
   InetAddr addr;
-  int fd = tcp1.Accept(addr);
+  int fd = svr.Accept(addr);
   ASSERT_GT(fd, 0);
   ASSERT_TRUE(addr == addr2);
 

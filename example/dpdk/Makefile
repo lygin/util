@@ -1,8 +1,11 @@
 PKGCONF = pkg-config
-APP = ring_test
-SRCS = ring_example.c
-CFLAGS += -g $(shell $(PKGCONF) --cflags libdpdk)
+APP = slab
+SRCS = slab.c
+CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS += $(shell $(PKGCONF) --libs libdpdk)
 
 $(APP): $(SRCS)
 	$(CC) $(CFLAGS) $(SRCS) -o $@ $(LDFLAGS)
+
+clean: ring_test
+	rm -rf $<

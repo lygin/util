@@ -21,9 +21,9 @@ TcpSocket::TcpSocket(int fd, const InetAddr& local_addr,
 TcpSocket::~TcpSocket() {
   if (fd_ != -1) {
     int ret = close(fd_);
-    if (ret < 0) {
-      LOG_ERROR("close failed fd %d errno [%s]", fd_, strerror(errno));
-    }
+    // if (ret < 0) {
+    //   LOG_ERROR("close failed fd %d errno [%s]", fd_, strerror(errno));
+    // }
   }
 }
 
@@ -345,6 +345,7 @@ int Poller::RemoveAndCloseFd(FdObj* fd_obj) {
     LOG_ERROR("close failed fd %d errno [%s]", fd, strerror(errno));
     return kNetWorkError;
   }
+  fd_obj->set_fd(-1);
 
   return 0;
 }
