@@ -3,8 +3,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <atomic>
+#include <unordered_map>
+#include <thread>
 #include "xxhash.h"
 #include "commom.h"
+#include "arena.h"
+
 using namespace std;
 
 
@@ -18,6 +22,11 @@ struct Bucket
 
 class HashTable
 {
+  Arena *get_arena()
+  {
+    thread_local Arena *arena = new Arena;
+    return arena;
+  }
 public:
   HashTable(uint32_t capacity) : size_(0), list_(nullptr) {
     capacity_ = nextPowerOf2(capacity);
@@ -32,7 +41,7 @@ public:
   {
     uint64_t hash = XXH3_64bits(&key, sizeof(key));
     uint32_t bucket_no = hash & (capacity_ - 1);
-    Bucket* newbucket = new Bucket;
+    Bucket* newbucket = (Bucket*)get_arena()->Allocate(sizeof(Bucket));
     newbucket->key = key;
     newbucket->value = value;
     while(true) {
