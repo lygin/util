@@ -8,10 +8,13 @@ libaio with O_direct attention:
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-const int N = 512;
-void done(io_context_t ctx, struct iocb *iocb, long res, long res2) {
-  printf("done\n");
-}
+#include "aioworker.h"
+#include <future>
+#include "timer.h"
+#include <unistd.h>
+const int N = 1024;
+const int BATCH_SIZE = 4096;
+
 int main()
 {
   int fd = open("testfile.txt", O_RDWR | O_CREAT | O_TRUNC | O_DIRECT, 0644);
@@ -19,43 +22,34 @@ int main()
   {
     perror("open");
   }
-  io_context_t ctx;
-  int ret = io_setup(1, &ctx);
-  if (ret < 0)
-  {
-    perror("io_setup");
+  AIOworker2 store;
+  char * buf[BATCH_SIZE] = {0};
+  for (int i=0; i<BATCH_SIZE; i++) {
+    posix_memalign((void**)&buf[i], 512, N);
+    memset(buf[i], 0, N);
+    for(int j=0; j<N; j++) buf[i][j] = 'a'+i;
+  } 
+  WaitGroup wg;
+  Task t[BATCH_SIZE];
+  wg.Add(BATCH_SIZE);
+  Timer tm;
+  for (int i=0; i<BATCH_SIZE; i++) {
+      t[i].op = WRITE;
+      t[i].fd = fd;
+      t[i].buf = buf[i];
+      t[i].off = i*N;
+      t[i].len = N;
+      t[i].wg = &wg;
+      store.submit_task(&t[i]);
   }
-  struct iocb *cb = (struct iocb *)calloc(1, sizeof(struct iocb));
-  char * buf = NULL;
-  posix_memalign((void**)&buf, N, N);
-  memset(buf, 0, N);
-  for(int i=0; i<N; i++) buf[i] = 'a';
-  io_prep_pwrite(cb, fd, buf, N, 0);
-  io_set_callback(cb,done);
-  ret = io_submit(ctx, 1, &cb);
-  printf("submit ret %d\n", ret);
-  if (ret < 0)
-  {
-    perror("io_submit");
-  }
-  struct io_event events[2];
-  while(true) {
-    ret = io_getevents(ctx, 0, 2, events, NULL);
-    if (ret < 0)
-    {
-      perror("io_getevents");
-    }
-    if(ret >= 1) break;
-  }
+  wg.Wait();
+  double elapsed = tm.GetDurationMs();
+  LOG_INFO("insert IOPS: %.2fKops\n avg latency: %.2fus", BATCH_SIZE*1.0/elapsed, elapsed*1024/BATCH_SIZE);
+
+  char bufr[N] = {0};
+  int ret = read(fd, buf[0], N);
+  printf("read: %d %s\n", ret, buf[0]);
   
-  printf("ret: %d\n", ret);
-  for (int i = 0; i < ret; i++)
-  {
-    struct iocb *completed_iocb = events[i].obj;
-    // Process the completed I/O operation here
-    io_callback_t func = (io_callback_t)completed_iocb->data;
-    func(ctx, completed_iocb, 0, 0);
-  }
-  io_destroy(ctx);
+  
   return 0;
 }
