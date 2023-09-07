@@ -13,7 +13,7 @@ libaio with O_direct attention:
 #include "timer.h"
 #include <unistd.h>
 const int N = 1024;
-const int BATCH_SIZE = 4096;
+const int BATCH_SIZE = 10'0000;
 
 int main()
 {
