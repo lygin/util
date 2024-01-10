@@ -28,6 +28,7 @@ public:
   // return the first free position of bitmap, return -1 if full
   int FirstFreePos() const {
     for (uint32_t i = 0; i < n64_; i++) {
+      //ffsl return 0 means has no 1, otherwise return pos(1-64)
       int ffp = ffsl(~data_[i]) - 1;
       if (ffp != -1) {
         return i * 64 + ffp;

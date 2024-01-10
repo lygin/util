@@ -4,7 +4,8 @@
 #include <cstdlib>
 #include <climits>
 #include <condition_variable>
-#include <mutex> 
+#include <mutex>
+#include <sched.h>
 #define CACHE_LINE_SIZE 64
 
 // SpinMutex has very low overhead for low-contention cases.  Method names
@@ -146,7 +147,7 @@ class RWLock {
 };
 
 /**
- * 读写均衡，写会等待所有读锁释放；读会等待写锁释放
+ * 读写均衡，写会等待所有读锁释放；读会等待写锁释放，类似nginx的读写锁
 */
 class CASRWLock {
   public:
@@ -154,7 +155,7 @@ class CASRWLock {
   void Rlock() {
     uint64_t i, n;
     uint64_t old_readers;
-    for ( ;; ) {
+    while(true) {
       old_readers = lock;
       if (old_readers != WLOCK && __sync_bool_compare_and_swap(&lock, old_readers, old_readers + 1)) {
           return;
@@ -173,7 +174,7 @@ class CASRWLock {
   }
   void Wlock() {
     uint64_t i, n;
-    for ( ;; ) {
+    while(true) {
       if (lock == 0 && __sync_bool_compare_and_swap(&lock, 0, WLOCK)) {
           return;
       }  
@@ -195,43 +196,17 @@ class CASRWLock {
       lock = 0;
       return;
     }
-    for ( ;; ) {
+    while(true) {
+      old_readers = lock;
       if (__sync_bool_compare_and_swap(&lock, old_readers, old_readers - 1)) {
           return;
       }
-      old_readers = lock;
     }
   }
 private:
   static const uint64_t SPIN = 2048;
   static const uint64_t WLOCK = ((unsigned long)-1);
   uint64_t lock;
-};
-
-class ReadLock {
- public:
-  explicit ReadLock(RWMutex *mu) : mu_(mu) { this->mu_->ReadLock(); }
-  // No copying allowed
-  ReadLock(const ReadLock &) = delete;
-  void operator=(const ReadLock &) = delete;
-
-  ~ReadLock() { this->mu_->ReadUnlock(); }
-
- private:
-  RWMutex *const mu_;
-};
-
-class WriteLock {
- public:
-  explicit WriteLock(RWMutex *mu) : mu_(mu) { this->mu_->WriteLock(); }
-  // No copying allowed
-  WriteLock(const WriteLock &) = delete;
-  void operator=(const WriteLock &) = delete;
-
-  ~WriteLock() { this->mu_->WriteUnlock(); }
-
- private:
-  RWMutex *const mu_;
 };
 
 template <class T>
