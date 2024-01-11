@@ -24,7 +24,6 @@ class FooHandler : public HandlerBase {
     assert(fd_obj->writable());
     char buf[100] = "hello";
     write(fd_obj->fd(), buf, strlen(buf));
-    assert(std::string(buf) == "hello" || std::string(buf) == "hellohello");
     written_count_++;
     return 0;
   }

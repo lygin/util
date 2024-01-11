@@ -12,33 +12,35 @@
 // are chosen so you can use std::unique_lock or std::lock_guard with it.
 class SpinMutex {
  public:
-  SpinMutex() : locked_(false) {}
+  SpinMutex() : lock_(0) {}
 
   bool try_lock() {
-    auto currently_locked = locked_.load(std::memory_order_relaxed);
-    return !currently_locked &&
-           locked_.compare_exchange_weak(currently_locked, true,
-                                         std::memory_order_acquire,
-                                         std::memory_order_relaxed);
+    return lock_ == 0 && __sync_bool_compare_and_swap(&lock_, 0, 1);
   }
 
   void lock() {
-    for (size_t tries = 0;; ++tries) {
-      if (try_lock()) {
-        // success
-        break;
+    uint32_t n, i;
+    while(true) {
+      if(lock_ == 0 && __sync_bool_compare_and_swap(&lock_, 0, 1)) {
+        return;
       }
-      asm volatile("pause");
-      if (tries > 100) {
-        std::this_thread::yield();
+      for(n = 1; n < kSpin; n <<= 1) {
+        for(i = 0; i < n; ++i) {
+          __asm__("pause");
+        }
+        if(lock_ == 0 && __sync_bool_compare_and_swap(&lock_, 0, 1)) {
+          return;
+        }
       }
     }
+    sched_yield();
   }
 
-  void unlock() { locked_.store(false, std::memory_order_release); }
+  void unlock() { lock_ = 0; }
 
  private:
-  std::atomic<bool> locked_;
+  uint32_t lock_;
+  static const uint32_t kSpin = 2048;
 };
 
 class RWMutex {
