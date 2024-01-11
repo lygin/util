@@ -80,7 +80,6 @@ rte_pause(void) {}
 #endif
 
 #define MPLOCKED        "lock ; "       /**< Insert MP lock prefix. */
-#define RTE_FORCE_INTRINSICS 1
 
 /*------------------------- 32 bit atomic operations -------------------------*/
 
@@ -103,23 +102,7 @@ rte_pause(void) {}
 static inline int
 rte_atomic32_cmpset(volatile uint32_t *dst, uint32_t exp, uint32_t src)
 {
-#ifndef RTE_FORCE_INTRINSICS
-    uint8_t res;
-
-    asm volatile(
-            MPLOCKED
-            "cmpxchgl %[src], %[dst];"
-            "sete %[res];"
-            : [res] "=a" (res),     /* output */
-              [dst] "=m" (*dst)
-            : [src] "r" (src),      /* input */
-              "a" (exp),
-              "m" (*dst)
-            : "memory");            /* no-clobber list */
-    return res;
-#else
     return __sync_bool_compare_and_swap(dst, exp, src);
-#endif
 }
 
 
@@ -129,23 +112,6 @@ enum rte_ring_queue_behavior {
 	RTE_RING_QUEUE_VARIABLE   /* Enq/Deq as many items a possible from ring */
 };
 
-#ifdef RTE_LIBRTE_RING_DEBUG
-/**
- * A structure that stores the ring statistics (per-lcore).
- */
-struct rte_ring_debug_stats {
-	uint64_t enq_success_bulk; /**< Successful enqueues number. */
-	uint64_t enq_success_objs; /**< Objects successfully enqueued. */
-	uint64_t enq_quota_bulk;   /**< Successful enqueues above watermark. */
-	uint64_t enq_quota_objs;   /**< Objects enqueued above watermark. */
-	uint64_t enq_fail_bulk;    /**< Failed enqueues number. */
-	uint64_t enq_fail_objs;    /**< Objects that failed to be enqueued. */
-	uint64_t deq_success_bulk; /**< Successful dequeues number. */
-	uint64_t deq_success_objs; /**< Objects successfully dequeued. */
-	uint64_t deq_fail_bulk;    /**< Failed dequeues number. */
-	uint64_t deq_fail_objs;    /**< Objects that failed to be dequeued. */
-} __rte_cache_aligned;
-#endif
 
 #define RTE_RING_NAMESIZE 32 /**< The maximum length of a ring name. */
 
@@ -165,9 +131,9 @@ struct rte_ring {
 
 	/** Ring producer status. */
 	struct prod {
-		uint32_t watermark;      /**< Maximum items before EDQUOT. */
+		uint32_t watermark;      /**< Maximum items before EDQUOT.e.g capacity */
 		uint32_t sp_enqueue;     /**< True, if single producer. */
-		uint32_t size;           /**< Size of ring. */
+		uint32_t size;           /**< Size of ring. capacity*/
 		uint32_t mask;           /**< Mask (size-1) of ring. */
 		volatile uint32_t head;  /**< Producer head. */
 		volatile uint32_t tail;  /**< Producer tail. */
@@ -176,7 +142,7 @@ struct rte_ring {
 	/** Ring consumer status. */
 	struct cons {
 		uint32_t sc_dequeue;     /**< True, if single consumer. */
-		uint32_t size;           /**< Size of the ring. */
+		uint32_t size;           /**< Size of the ring. capacity */
 		uint32_t mask;           /**< Mask (size-1) of ring. */
 		volatile uint32_t head;  /**< Consumer head. */
 		volatile uint32_t tail;  /**< Consumer tail. */
@@ -185,11 +151,6 @@ struct rte_ring {
 #else
 	} cons;
 #endif
-
-#ifdef RTE_LIBRTE_RING_DEBUG
-	struct rte_ring_debug_stats stats[RTE_MAX_LCORE];
-#endif
-
 	void * ring[0] __rte_cache_aligned; /**< Memory space of ring starts here.
 	 	 	 	 	 	 	 	 	 	 * not volatile so need to be careful
 	 	 	 	 	 	 	 	 	 	 * about compiler re-ordering */
@@ -203,24 +164,6 @@ struct rte_ring {
 #define RTE_RING_QUOT_EXCEED (1 << 31)  /**< Quota exceed for burst ops */
 #define RTE_RING_SZ_MASK  (unsigned)(0x0fffffff) /**< Ring size mask */
 
-/**
- * @internal When debug is enabled, store ring statistics.
- * @param r
- *   A pointer to the ring.
- * @param name
- *   The name of the statistics field to increment in the ring.
- * @param n
- *   The number to add to the object-oriented statistics.
- */
-#ifdef RTE_LIBRTE_RING_DEBUG
-#define __RING_STAT_ADD(r, name, n) do {		\
-		unsigned __lcore_id = rte_lcore_id();	\
-		r->stats[__lcore_id].name##_objs += n;	\
-		r->stats[__lcore_id].name##_bulk += 1;	\
-	} while(0)
-#else
-#define __RING_STAT_ADD(r, name, n) do {} while(0)
-#endif
 
 /**
  * Create a new ring named *name* in memory.
@@ -297,6 +240,7 @@ void rte_ring_dump(const struct rte_ring *r);
 	uint32_t idx = prod_head & mask; \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & ((~(unsigned)0x3))); i+=4, idx+=4) { \
+			// 优化，4个指针一压
 			r->ring[idx] = obj_table[i]; \
 			r->ring[idx+1] = obj_table[i+1]; \
 			r->ring[idx+2] = obj_table[i+2]; \
@@ -394,26 +338,25 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		/* check that we have enough room in ring */
 		if (unlikely(n > free_entries)) {
 			if (behavior == RTE_RING_QUEUE_FIXED) {
-				__RING_STAT_ADD(r, enq_fail, n);
 				return -ENOBUFS;
 			}
 			else {
 				/* No free entry available */
 				if (unlikely(free_entries == 0)) {
-					__RING_STAT_ADD(r, enq_fail, n);
 					return 0;
 				}
 
 				n = free_entries;
 			}
 		}
-
+		// 1.抢位置
 		prod_next = prod_head + n;
 		success = rte_atomic32_cmpset(&r->prod.head, prod_head,
 					      prod_next);
 	} while (unlikely(success == 0));
 
 	/* write entries in ring */
+	// 2.将指针数据压入ring数组中[prod_head,prod_next)
 	ENQUEUE_PTRS();
 	COMPILER_BARRIER();
 
@@ -421,20 +364,19 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	if (unlikely(((mask + 1) - free_entries + n) > r->prod.watermark)) {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
 				(int)(n | RTE_RING_QUOT_EXCEED);
-		__RING_STAT_ADD(r, enq_quota, n);
 	}
 	else {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
-		__RING_STAT_ADD(r, enq_success, n);
 	}
 
 	/*
 	 * If there are other enqueues in progress that preceeded us,
 	 * we need to wait for them to complete
 	 */
+	// 3.如果还有先于我们压队的进程，那么我们等待之前的先做完 prod.tail != prod_head
 	while (unlikely(r->prod.tail != prod_head))
 		rte_pause();
-
+	// 4.我及我之前的进程都压队完成了，更新prod.tail = prod_next = prod_head + n
 	r->prod.tail = prod_next;
 	return ret;
 }
@@ -482,13 +424,11 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	/* check that we have enough room in ring */
 	if (unlikely(n > free_entries)) {
 		if (behavior == RTE_RING_QUEUE_FIXED) {
-			__RING_STAT_ADD(r, enq_fail, n);
 			return -ENOBUFS;
 		}
 		else {
 			/* No free entry available */
 			if (unlikely(free_entries == 0)) {
-				__RING_STAT_ADD(r, enq_fail, n);
 				return 0;
 			}
 
@@ -507,11 +447,9 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	if (unlikely(((mask + 1) - free_entries + n) > r->prod.watermark)) {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
 			(int)(n | RTE_RING_QUOT_EXCEED);
-		__RING_STAT_ADD(r, enq_quota, n);
 	}
 	else {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
-		__RING_STAT_ADD(r, enq_success, n);
 	}
 
 	r->prod.tail = prod_next;
@@ -567,30 +505,30 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 		 * (the result is always modulo 32 bits even if we have
 		 * cons_head > prod_tail). So 'entries' is always between 0
 		 * and size(ring)-1. */
+		// 1.计算有多少个item，如果剩余的小于取的n，返回错误
 		entries = (prod_tail - cons_head);
 
 		/* Set the actual entries for dequeue */
 		if (n > entries) {
 			if (behavior == RTE_RING_QUEUE_FIXED) {
-				__RING_STAT_ADD(r, deq_fail, n);
 				return -ENOENT;
 			}
 			else {
 				if (unlikely(entries == 0)){
-					__RING_STAT_ADD(r, deq_fail, n);
 					return 0;
 				}
 
 				n = entries;
 			}
 		}
-
+		// 2.抢位置，得到cons_next
 		cons_next = cons_head + n;
 		success = rte_atomic32_cmpset(&r->cons.head, cons_head,
 					      cons_next);
 	} while (unlikely(success == 0));
 
 	/* copy in table */
+	// 3.取ring数组的指针数据
 	DEQUEUE_PTRS();
 	COMPILER_BARRIER();
 
@@ -598,10 +536,11 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 	 * If there are other dequeues in progress that preceded us,
 	 * we need to wait for them to complete
 	 */
+	// 4.等待之前的deque进程完成, cons.tail != cons_head
 	while (unlikely(r->cons.tail != cons_head))
 		rte_pause();
 
-	__RING_STAT_ADD(r, deq_success, n);
+	// 5.设置cons.tail = cons_next
 	r->cons.tail = cons_next;
 
 	return behavior == RTE_RING_QUEUE_FIXED ? 0 : n;
@@ -649,12 +588,10 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 
 	if (n > entries) {
 		if (behavior == RTE_RING_QUEUE_FIXED) {
-			__RING_STAT_ADD(r, deq_fail, n);
 			return -ENOENT;
 		}
 		else {
 			if (unlikely(entries == 0)){
-				__RING_STAT_ADD(r, deq_fail, n);
 				return 0;
 			}
 
@@ -669,7 +606,6 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 	DEQUEUE_PTRS();
 	COMPILER_BARRIER();
 
-	__RING_STAT_ADD(r, deq_success, n);
 	r->cons.tail = cons_next;
 	return behavior == RTE_RING_QUEUE_FIXED ? 0 : n;
 }
