@@ -41,7 +41,6 @@ add_executable(
 target_link_libraries(
   test_main
   GTest::gtest_main
-  tbb
 )
 
 include(GoogleTest)

@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <random>
 #include <thread>
-#include "tbb/concurrent_hash_map.h"
 #include "ska_hashtable.h"
 #include "unordered_dense_map.h"
 #include "cas_hashtable.h"
@@ -196,62 +195,6 @@ TEST(unordered_dense, st_string)
   }
   elapsed = t.GetDurationNs();
   printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
-}
-
-TEST(tbb_conhashtable, mt_int64_loadc) {
-  using namespace tbb;
-  using namespace std;
-  concurrent_hash_map<uint64_t, uint64_t> ht(65536);
-  vector<thread> insertingThreads;
-  vector<thread> searchingThreads;
-  vector<int> failed(numThreads);
-  auto insert = [&ht](int from, int to) {
-	  for(int i=from; i<to; i++) {
-      concurrent_hash_map<uint64_t, uint64_t>::accessor accessor;
-	    ht.insert(accessor, test_keys[i]);
-      accessor->second = test_keys[i];
-	  }
-  };
-  auto search = [&ht, &failed](int from, int to, int tid){
-	  int fail = 0;
-	  for(int i=from; i<to; i++){
-      concurrent_hash_map<uint64_t, uint64_t>::const_accessor ca;
-	    bool ret = ht.find(ca, test_keys[i]);
-	    if(ret == false || ca->second != test_keys[i]){
-		    fail++;
-	    }
-	  }
-	  failed[tid] = fail;
-  };
-  const size_t chunk = N/numThreads;
-  clear_cache();
-  Timer t;
-  for(int i=0; i<numThreads; i++){
-    if(i != numThreads-1)
-      insertingThreads.emplace_back(thread(insert, chunk*i, chunk*(i+1)));
-    else 
-      insertingThreads.emplace_back(thread(insert, chunk*i, N));
-  }
-  for(auto& t: insertingThreads) t.join();
-  double elapsed = t.GetDurationNs();
-  printf("Insertion %f Mops\n",(double)N/(elapsed/1000.0));
-
-
-  clear_cache();
-  t.Reset();
-  for(int i=0; i<numThreads; i++){
-	  if(i != numThreads-1)
-	    searchingThreads.emplace_back(thread(search, chunk*i, chunk*(i+1), i));
-	  else
-	    searchingThreads.emplace_back(thread(search, chunk*i, N, i));
-  }
-  for(auto& t: searchingThreads) t.join();
-  elapsed = t.GetDurationNs();
-  printf("Search %f Mops\n", (double)N/(elapsed/1000.0));
-  int failedSearch = 0;
-  for(auto& v: failed) failedSearch += v;
-  cout << failedSearch << " failedSearch" << "\n";
-  assert(failedSearch == 0);
 }
 
 TEST(cas_hashtable, mt_int64_loadc) {
