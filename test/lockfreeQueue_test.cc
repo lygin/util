@@ -5,10 +5,9 @@ extern "C" {
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "rte_ring.h"
 }
 
-#include "lockfreeQueue_nocheck.h"
+#include "lockfreeQueue.h"
 #include "timer.h"
 #include "concurrentqueue.h"
 #include <atomic>
@@ -24,7 +23,6 @@ struct cc_queue_node_t {
     int data;
 };
 
-struct rte_ring *r;
 MPMCRing<cc_queue_node_t*> mpmc_queue(RING_SIZE);
 moodycamel::ConcurrentQueue<cc_queue_node_t*> conq(RING_SIZE);
 
@@ -37,7 +35,6 @@ void produce(int c) {
         switch (c)
         {
         case 0:
-            ret = rte_ring_mp_enqueue(r, p);
             EXPECT_EQ(ret, 0);
             break;
         case 1:
@@ -62,7 +59,6 @@ long long consume(int c) {
         switch (c)
         {
         case 0:
-            while(rte_ring_mc_dequeue(r, (void **)&p));
             break;
         case 1:
             while(mpmc_queue.try_pop(p) == false);
@@ -80,20 +76,6 @@ long long consume(int c) {
 }
 
 
-TEST(rte_ring, basic) {
-    r = rte_ring_create("ring", RING_SIZE, 0);
-    Timer tm;
-    for(int i = 0; i <produce_threads; ++i) {
-        (void)std::async(produce, 0);
-    }
-    long long sum = 0;
-    for(int i = 0; i<consume_threads; ++i) {
-        sum += std::async(consume, 0).get();
-    }
-    ASSERT_EQ(sum, (N-1)*N*produce_threads/2);
-    printf("IOPS: %fMops\n", (double)N*(produce_threads+consume_threads)/tm.GetDurationUs());
-    rte_ring_free(r);
-}
 
 TEST(mpmc_queue, basic) {
     Timer tm;

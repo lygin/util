@@ -45,8 +45,8 @@ public:
     newbucket->key = key;
     newbucket->value = value;
     while(true) {
-      newbucket->next_bucket = list_[bucket_no];
       Bucket *old_head = list_[bucket_no];
+      newbucket->next_bucket = list_[bucket_no];
       if(__sync_bool_compare_and_swap(&list_[bucket_no], old_head, newbucket)) {
         break;
       }

@@ -7,7 +7,7 @@
 #include <future>
 #include <functional>
 #include <stdexcept>
-#include "lockfreeQueue_nocheck.h"
+#include "lockfreeQueue.h"
 
 namespace lockfree {
 

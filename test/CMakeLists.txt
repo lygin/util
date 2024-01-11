@@ -25,8 +25,6 @@ enable_testing()
 
 set(cutil ../c-util)
 set(cpputil ../cpp-util)
-set(CLHT_DIR ../third_party/CLHT)
-link_directories(${CLHT_DIR} ${CLHT_DIR}/external/lib)
 include_directories(${cutil} ${cpputil} ${CLHT_DIR}/include)
 
 aux_source_directory(. src)
@@ -34,9 +32,7 @@ aux_source_directory(. src)
 add_executable(
   test_main
   ${src}
-  ${cutil}/ngx_lock.c
   ${cutil}/coroutine.c
-  ${cutil}/rte_ring.c
   ${cpputil}/disk_manager.cc
   ${cpputil}/epoller.cc
 )
@@ -45,8 +41,6 @@ target_link_libraries(
   test_main
   GTest::gtest_main
   tbb
-  clht
-  ssmem
 )
 
 include(GoogleTest)
