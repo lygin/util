@@ -110,8 +110,10 @@ private:
 
 template <typename T>
 std::function<void(T *)> smart_ptr<T>::default_del = [](T *p) {
-  delete p;
-  p = nullptr;
+  if (p != nullptr) {
+    delete p;
+    p = nullptr;
+  }
 };
 
 template <typename T, typename... Args>

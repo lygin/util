@@ -236,13 +236,13 @@ struct SkipList<K, Cmp>::Node {
 	}
 	// No-barrier variants that can be safely used in a few locations.
 	Node* NoBarrier_Next(int n) {
-    assert(n >= 0);
-    return next_[n].load(std::memory_order_relaxed);
-  }
+		assert(n >= 0);
+		return next_[n].load(std::memory_order_relaxed);
+	}
 	void NoBarrier_SetNext(int n, Node* x) {
-    assert(n >= 0);
-    next_[n].store(x, std::memory_order_relaxed);
-  }
+		assert(n >= 0);
+		next_[n].store(x, std::memory_order_relaxed);
+	}
 	private:
 	// Array of length equal to the node height.  next_[0] is lowest level link.
 	std::atomic<Node*> next_[1];
@@ -273,15 +273,15 @@ class SkipList<K, Cmp>::Iterator {
 
 	void Next() {
 		assert(Valid());
-  	node_ = node_->Next(0);
+  		node_ = node_->Next(0);
 	}
 
 	void Prev() {
 		assert(Valid());
-  	node_ = list_->FindLessThan(node_->key);
-  	if (node_ == list_->head_) {
-    	node_ = nullptr;
-  	}
+		node_ = list_->FindLessThan(node_->key);
+		if (node_ == list_->head_) {
+			node_ = nullptr;
+		}
 	}
 
 	// Advance to the first entry with a key >= target
@@ -292,7 +292,7 @@ class SkipList<K, Cmp>::Iterator {
 	// Retreat to the last entry with a key <= target
 	void SeekForPrev(const K& target) {
 		Seek(target);
-  	if (!Valid()) {
+  		if (!Valid()) {
 			SeekToLast();
 		}
 		while (Valid() && list_->LessThan(target, key())) {

@@ -3,7 +3,6 @@
 ngx_uint_t ngx_pagesize = 4096;
 ngx_uint_t ngx_pagesize_shift = 12;
 /*
-由于指针是4的倍数,那么后两位一定为0,此时我们可以利用指针的后两位做标记,充分利用空间.
 在nginx的slab中,我们使用ngx_slab_page_s结构体中的指针pre的后两位做标记,用于指示该page页面的slot块数与ngx_slab_exact_size的关系.
 当page划分的slot块小于32时候,pre的后两位为NGX_SLAB_SMALL.
 当page划分的slot块等于32时候,pre的后两位为NGX_SLAB_EXACT
@@ -26,25 +25,15 @@ ngx_uint_t ngx_pagesize_shift = 12;
 
 #define NGX_SLAB_BUSY 0xffffffffffffffff
 
-#define ngx_slab_junk(p, size)
-
 static ngx_slab_page_t *ngx_slab_alloc_pages(ngx_slab_pool_t *pool,
                                              ngx_uint_t pages);
 static void ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
                                 ngx_uint_t pages);
-static ngx_uint_t ngx_slab_max_size; // 设置ngx_slab_max_size = 2048B。如果一个页要存放多个obj，则obj size要小于这个数值
+static ngx_uint_t ngx_slab_max_size; // 设置ngx_slab_max_size = 2048B
 
 static ngx_uint_t ngx_slab_exact_size;  // 设置ngx_slab_exact_size = 128B。分界是否要在缓存区分配额外空间给bitmap
-static ngx_uint_t ngx_slab_exact_shift; // ngx_slab_exact_shift = 7，即128的位表示 //每个slot块大小的位移是ngx_slab_exact_shift
+static ngx_uint_t ngx_slab_exact_shift; // ngx_slab_exact_shift = 7，即128的位表示
 
-/*
-注意，在ngx_slab_pool_t里面有两种类型的slab page，虽然都是ngx_slab_page_t定义的结构，但是功能不尽相同。一种是slots，用来表示存
-放较小obj的内存块(如果页大小是 4096B，则是<2048B的obj，即小于1/2页)，另一种来表示所要分配的空间在缓存区的位置。Nginx把缓存obj分
-成大的 (>=2048B)和小的(<2048B)。每次给大的obj分配一整个页，而把多个小obj存放在一个页中间，用bitmap等方法来表示 其占用情况。而小
-的obj又分为3种：小于128B，等于128B，大于128B且小于2048B。其中小于128B的obj需要在实际缓冲区额外分配 bitmap空间来表示内存使用情况
-，这样会造成一定的空间损失。等于或大于128B的obj因为可以用一个32bit的整形来表示其状态，所以就可以直接用slab成员。每次分配 的空间是2^n，
-最小是8byte，8，16，32，64，128，256，512，1024，2048。小于2^i且大于2^(i-1)的obj会被分 配一个2^i的空间，比如56byte的obj就会分配一个64byte的空间。
-*/
 void ngx_slab_init(ngx_slab_pool_t *pool)
 {
     u_char *p;
@@ -68,19 +57,12 @@ void ngx_slab_init(ngx_slab_pool_t *pool)
     pool->min_size = 1 << pool->min_shift; // 最小分配的空间是8byte
     printf("pool min_size %dB\n", pool->min_size);
 
-    p = (u_char *)pool + sizeof(ngx_slab_pool_t); // 共享内存前面的sizeof(ngx_slab_pool_t)是给slab poll的
-    size = pool->end - p;                         // size是总的共享内存 - sizeof(ngx_slab_pool_t)字节后的长度
-
-    ngx_slab_junk(p, size);
+    p = (u_char *)pool + sizeof(ngx_slab_pool_t);
+    size = pool->end - p;// size是总的共享内存 - sizeof(ngx_slab_pool_t)字节后的长度
 
     slots = (ngx_slab_page_t *)p;
     n = ngx_pagesize_shift - pool->min_shift; // 12-3=9
 
-    /*
-    这些slab page是给大小为8，16，32，64，128，256，512，1024，2048byte的内存块 这些slab page的位置是在pool->pages的前面初始化
-    共享内存的其实地址开始处数据:ngx_slab_pool_t + 9 * sizeof(ngx_slab_page_t)(slots_m[]) + pages * sizeof(ngx_slab_page_t)(pages_m[]) +pages*ngx_pagesize(这是实际的数据部分，
-    每个ngx_pagesize都由前面的一个ngx_slab_page_t进行管理，并且每个ngx_pagesize最前端第一个obj存放的是一个或者多个int类型bitmap，用于管理每块分配出去的内存)
-    */
     for (i = 0; i < n; i++)
     {
         slots[i].slab = 0;
@@ -88,13 +70,9 @@ void ngx_slab_init(ngx_slab_pool_t *pool)
         slots[i].prev = 0;
     }
 
-    p += n * sizeof(ngx_slab_page_t); // 跳过上面那些slab page
+    p += n * sizeof(ngx_slab_page_t);
 
-    // 计算这个空间总共可以分配的缓存页(4KB)的数量，每个页的overhead是一个slab page的大小
-    // 这儿的overhead还不包括之后给<128B物体分配的bitmap的损耗
-
-    // 这里 + sizeof(ngx_slab_page_t)的原因是每个ngx_pagesize都有对应的ngx_slab_page_t进行管理
-    pages = (ngx_uint_t)(size / (ngx_pagesize + sizeof(ngx_slab_page_t))); // 这里的size是不是应该把头部n * sizeof(ngx_slab_page_t)减去后在做计算更加准确?
+    pages = (ngx_uint_t)(size / (ngx_pagesize + sizeof(ngx_slab_page_t)));
     // 把每个缓存页最前面的sizeof(ngx_slab_page_t)字节对应的slab page归0
     memset(p, 0, pages * sizeof(ngx_slab_page_t));
 
@@ -109,17 +87,12 @@ void ngx_slab_init(ngx_slab_pool_t *pool)
     pool->pages->next = &pool->free;
     pool->pages->prev = (uintptr_t)&pool->free;
 
-    // 实际缓存区(页)的开头，对齐   //因为对齐的原因,使得m_page数组和数据区域之间可能有些内存无法使用,
+    // 实际缓存区(页)的开头，对齐
     pool->start = (u_char *)
         ngx_align_ptr((uintptr_t)p + pages * sizeof(ngx_slab_page_t),
                       ngx_pagesize);
 
     // 根据实际缓存区的开始和结尾再次更新内存页的数目
-    // 由于内存对齐操作(pool->start处内存对齐),可能导致pages减少,
-    // 所以要调整.m为调整后page页面的减小量.
-    // 其实下面几行代码就相当于:
-    //  pages =(pool->end - pool->start) / ngx_pagesize
-    // pool->pages->slab = pages;
     m = pages - (pool->end - pool->start) / ngx_pagesize;
     if (m > 0)
     {
@@ -140,39 +113,17 @@ void ngx_slab_init(ngx_slab_pool_t *pool)
 1.如果size大于等于一页,那么从m_page中查找,如果有则直接返回,否则失败.
 2.如果size小于一页,如果链表中有空余slot块.
      (1).如果size大于ngx_slab_exact_size,
-a.设置slab的高16位(32位系统)存放solt对应的map,并且该对应为map的地位对应page中高位的slot块.例如1110对应为第1块slot是可用的,2-4块不可用.slab的低16为存储slot块大小的位移.
-b.设置m_page元素的pre指针为NGX_SLAB_BIG.
-c.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
+        b.设置m_page元素的pre指针为NGX_SLAB_BIG.
+        c.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
    (2).如果size等于ngx_slab_exact_size
-a.设置slab存储slot的map,同样slab中的低位对应高位置的slot.
-b.设置m_page元素的pre指针为NGX_SLAB_EXACT.
-c.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
+        b.设置m_page元素的pre指针为NGX_SLAB_EXACT.
+        c.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
    (3).如果size小于ngx_slab_exact_size
-a.用page中的前几个slot存放slot的map,同样低位对应高位.
-b.设置m_page元素的pre指针为NGX_SLAB_SMALL.
-b.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
- 3.如果链表中没有空余的slot块,则在free链表中找到一个空闲的页面分配给m_slot数组元素中的链表.
-   (1).如果size大于ngx_slab_exact_size,
-a.设置slab的高16位(32位系统)存放solt对应的map,并且该对应为map的地位对应page中高位的slot块.slab的低16为存储slot块大小的位移.
-b.设置m_page元素的pre指针为NGX_SLAB_BIG.
-c.将分配的页面链入m_slot数组元素的链表中.
-   (2).如果size等于ngx_slab_exact_size
-a.设置slab存储slot的map,同样slab中的低位对应高位置的slot.
-b.设置m_page元素的pre指针为NGX_SLAB_EXACT.
-c.将分配的页面链入m_slot数组元素的链表中.
-   (3).如果size小于ngx_slab_exact_size
-a.用page中的前几个slot存放slot的map,同样低位对应高位.
-b.设置m_page元素的pre指针为NGX_SLAB_SMALL.
-c.将分配的页面链入m_slot数组元素的链表中.
-4.成功则返回分配的内存块,即指针p,否则失败,返回null.
-
-/*
-在一个page页中获取小与2048的obj块的时候，都会设置page->next = &slots[slot]; page->prev = &slots[slot]，slots[slot].next = page;也就是作为obj块的页
-page[]都会和对应的slots[]关联，如果是分配大于2048的空间，则会分配整个页，其page[]和slots就没有关系
-当该page页用完后，则会重新把page[]的next和prev置为NULL，同时把对应的slot[]的next和prev指向slot[]本身
-当page用完后释放其中一个obj后，有恢复为page->next = &slots[slot]; page->prev = &slots[slot]，slots[slot].next = page;
+        b.设置m_page元素的pre指针为NGX_SLAB_SMALL.
+        b.如果page的全部slot都被使用了,那么将此页面从m_slot数组元素的链表中移除.
+3.如果链表中没有空余的slot块,则在free链表中找到一个空闲的页面分配给m_slot数组元素中的链表.
 */
-void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
+void *ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
 {
     size_t s;
     uintptr_t p, n, m, mask, *bitmap;
@@ -180,16 +131,11 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
     ngx_slab_page_t *page, *prev, *slots;
 
     if (size > ngx_slab_max_size)
-    { // 如果是large obj, size >= 2048B
-
-        LOG_INFO("slab alloc: %uz", size);
-
+    {
         // 分配1个或多个内存页
-        page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift) + ((size % ngx_pagesize) ? 1 : 0)); // 例如size刚好是4K,则page=1,如果是4K+1，则page=2
+        page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift) + ((size % ngx_pagesize) ? 1 : 0));
         if (page)
         {
-            // 获得page向对于page[0]的偏移量由于m_page和page数组是相互对应的,即m_page[0]管理page[0]页面,m_page[1]管理page[1]页面.
-            // 所以获得page相对于m_page[0]的偏移量就可以根据start得到相应页面的偏移量.
             p = (page - pool->pages) << ngx_pagesize_shift;
             p += (uintptr_t)pool->start; // 得到实际分配的页的起始地址
         }
@@ -200,16 +146,14 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
 
         goto done;
     }
-    // 较小的obj, size < 2048B根据需要分配的size来确定在slots的位置，每个slot存放一种大小的obj的集合，如slots[0]表示8byte的空间，
-    // slots[3]表示64byte的空间
-    // 计算使用哪个slots[]，也就是需要分配的空间是多少  例如size=9,则会使用slot[1]，也就是16字节
+    // 较小的obj, size < 2048B根据需要分配的size来确定在slots的位置，每个slot存放一种大小的obj的集合
     if (size > pool->min_size)
     {
         shift = 1;
         for (s = size - 1; s >>= 1; shift++)
-        { /* void */
+        {
         }
-        slot = shift - pool->min_shift;
+        slot = shift - pool->min_shift; //定位slot位置
     }
     else
     {
@@ -218,31 +162,20 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
         slot = 0;
     }
 
-    // ngx_slab_pool_t + 9 * sizeof(ngx_slab_page_t) + pages * sizeof(ngx_slab_page_t) +pages * ngx_pagesize(实际的数据部分)
-    LOG_INFO("slab alloc: %uB slot: %ui", size, slot);
-
     // 指向 slots[0-8]数组
     slots = (ngx_slab_page_t *)((u_char *)pool + sizeof(ngx_slab_pool_t));
-    // 在ngx_slab_init中slots[]->next默认是指向自己的
-    // 根据m_slot[slot]获得相应的m_page元素,然后找到相应页面.
     page = slots[slot].next;
 
     if (page->next != page)
-    { // 如果之前已经有此类大小obj且那个已经分配的内存缓存页还未满
-
+    {
         if (shift < ngx_slab_exact_shift)
-        { // 小obj，size < 128B，更新内存缓存页中的bitmap，并返回待分配的空间在缓存的位置
-
+        {
+            // 小obj，size < 128B，更新内存缓存页中的bitmap，并返回待分配的空间在缓存的位置
             do
             {
                 p = (page - pool->pages) << ngx_pagesize_shift;
                 bitmap = (uintptr_t *)(pool->start + p); // pool->start开始的128字节为需要分配的空间，其后紧跟一个int 4字节空间用于bitmap
 
-                /*
-               例如要分配的size为54字节，则在前面计算出的shift对应的字节数应该是64字节，由于一个页面全是64字节obj大小，所以一共有64
-               个64字节的obj，64个obj至少需要64位来表示每个obj是否已使用，因此至少需要64位(也就是8字节，2个int),所以至少要暂用一个64
-               字节obj来存储该bitmap信息，第一个64字节obj实际上只用了8字节，其他56字节未用
-               */
                 // 计算需要多少个字节来存储bitmap
                 map = (1 << (ngx_pagesize_shift - shift)) / (sizeof(uintptr_t) * 8);
 
@@ -254,16 +187,16 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
                         // 如果page的obj块空闲,也就是bitmap指向的32个obj是否都已经被分配出去了
                         // 如果整个page页的所有slab已经用完，则会在后面的ngx_slab_alloc_pages从新获取空间并划分slab，然后分配
                         for (m = 1, i = 0; m; m <<= 1, i++)
-                        { // 如果obj块被占用,继续查找  从这32个obj中找出第一个未被分配出去的obj
+                        {
                             if ((bitmap[n] & m))
                             {
                                 continue;
                             }
 
-                            // 找到了，该bitmap对应的第n个(注意是位移操作后的m)未使用，使用他，同时置位该位，表示该bitmp[n]已经不能再被分配，因为已经本次分配出去了
+                            // 找到了，该bitmap对应的第n个(注意是位移操作后的m)未使用
                             bitmap[n] |= m;
 
-                            i = ((n * sizeof(uintptr_t) * 8) << shift) + (i << shift); // 该bit所处的整个bitmap中的第几位(例如需要3个bitmap表示所有的slab块，则现在是第三个bitmap的第一位，则i=32+32+1-1,bit从0开始)
+                            i = ((n * sizeof(uintptr_t) * 8) << shift) + (i << shift);
 
                             if (bitmap[n] == NGX_SLAB_BUSY)
                             { // 如果该32位图在这次取到最后第31位(0-31)的时候，前面的bitmap[n] |= m后;使其刚好NGX_SLAB_BUSY，也就是位图填满
@@ -302,7 +235,6 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
         {
             // size == 128B，因为一个页可以放32个，用slab page的slab成员来标注每块内存的占用情况，不需要另外在内存缓存区分配bitmap，
             // 并返回待分配的空间在缓存的位置
-
             do
             {
                 if (page->slab != NGX_SLAB_BUSY)
@@ -394,24 +326,13 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
     // 分出一页加入到m_slot数组对应元素中
     page = ngx_slab_alloc_pages(pool, 1);
 
-    /*
-       例如要分配的size为54字节，则在前面计算出的shift对应的字节数应该是64字节，由于一个页面全是64字节obj大小，所以一共有64
-       个64字节的obj，64个obj至少需要64位来表示每个obj是否已使用，因此至少需要64位(也就是8字节，2个int),所以至少要暂用一个64
-       字节obj来存储该bitmap信息，第一个64字节obj实际上只用了8字节，其他56字节未用
-     */
     if (page)
     {
-        // size<128
         if (shift < ngx_slab_exact_shift)
         {
             p = (page - pool->pages) << ngx_pagesize_shift; // slot块的map存储在page的slot中定位到对应的page
             bitmap = (uintptr_t *)(pool->start + p);        // page页的起始地址的一个uintptr_t类型4字节用来存储bitmap信息
-
-            /*
-               例如要分配的size为54字节，则在前面计算出的shift对应的字节数应该是64字节，由于一个页面全是64字节obj大小，所以一共有64
-               个64字节的obj，64个obj至少需要64位来表示每个obj是否已使用，因此至少需要64位(也就是8字节，2个int),所以至少要暂用一个64
-               字节obj来存储该bitmap信息，第一个64字节obj实际上只用了8字节，其他56字节未用
-               */
+ 
             s = 1 << shift;                                  // s表示每个slot块的大小,字节为单位
             n = (1 << (ngx_pagesize_shift - shift)) / 8 / s; // 计算bitmap需要多少个slot obj块
 
@@ -433,7 +354,6 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
             }
 
             page->slab = shift; // 该页的一个obj对应的字节移位数大小
-            /* ngx_slab_pool_t + 9 * sizeof(ngx_slab_page_t)(slots_m[]) + pages * sizeof(ngx_slab_page_t)(pages_m[]) +pages*ngx_pagesize */
             page->next = &slots[slot];                             // 指向上面的slots_m[i],例如obj大小64字节，则指向slots[2]   slots[0-8] -----8-2048
             page->prev = (uintptr_t)&slots[slot] | NGX_SLAB_SMALL; // 标记该页中存储的是小与128的obj
 
@@ -451,9 +371,6 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
             page->slab = 1; // slab设置为1   page->slab存储obj的bitmap,例如这里为1，表示说第一个obj分配出去了 4K有32个128字节obj,因此一个slab位图刚好可以表示这32个obj
             page->next = &slots[slot];
             // 用指针的后两位做标记,用NGX_SLAB_SMALL表示slot块小于ngx_slab_exact_shift
-            /*
-                设置slab的高16位(32位系统)存放solt对应的map,并且该对应为map的地位对应page中高位的slot块.slab的低16为存储slot块大小的位移.
-               */
             page->prev = (uintptr_t)&slots[slot] | NGX_SLAB_EXACT;
 
             slots[slot].next = page;
@@ -464,9 +381,7 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
             goto done;
         }
         else
-        { /* shift > ngx_slab_exact_shift */
-
-            // 大于128，也就是至少256�,4K最多也就16个256，因此只需要slab的高16位表示obj位图即可
+        {
             page->slab = ((uintptr_t)1 << NGX_SLAB_MAP_SHIFT) | shift;
             page->next = &slots[slot];
             // 用指针的后两位做标记,用NGX_SLAB_BIG表示slot块大于ngx_slab_exact_shift
@@ -484,18 +399,15 @@ void *ngx_slab_alloc_unlocked(ngx_slab_pool_t *pool, size_t size)
     p = 0;
 
 done:
-
-    LOG_INFO("slab alloc: %p", p);
-
     return (void *)p;
 }
 
 void *
-ngx_slab_calloc_unlocked(ngx_slab_pool_t *pool, size_t size)
+ngx_slab_calloc(ngx_slab_pool_t *pool, size_t size)
 {
     void *p;
 
-    p = ngx_slab_alloc_unlocked(pool, size);
+    p = ngx_slab_alloc(pool, size);
     if (p)
     {
         memset(p, 0, size);
@@ -509,26 +421,24 @@ ngx_slab_calloc_unlocked(ngx_slab_pool_t *pool, size_t size)
 1.找到p对应的内存块和对应的m_page数组元素,
 2.根据m_page数组元素的pre指针确定页面类型
      (1).如果NGX_SLAB_SMALL类型,即size小于ngx_slab_exact_size
-a.设置相应slot块为可用
-b.设如果整个页面都可用,则将页面归入free中
+        a.设置相应slot块为可用
+        b.设如果整个页面都可用,则将页面归入free中
     (2).如果NGX_SLAB_EXACT类型,即size等于ngx_slab_exact_size
-a.设置相应slot块为可用
-b.设如果整个页面都可用,则将页面归入free中
+        a.设置相应slot块为可用
+        b.设如果整个页面都可用,则将页面归入free中
     (3).如果NGX_SLAB_BIG类型,即size大于ngx_slab_exact_size
-a.设置相应slot块为可用
-b.设如果整个页面都可用,则将页面归入free中
+        a.设置相应slot块为可用
+        b.设如果整个页面都可用,则将页面归入free中
      (4).如果NGX_SLAB_PAGE类型,即size大小大于等于一个页面
-a.设置相应页面块为可用
-b.将页面归入free中
+        a.设置相应页面块为可用
+        b.将页面归入free中
 */
-void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
+void ngx_slab_free(ngx_slab_pool_t *pool, void *p)
 {
     size_t size;
     uintptr_t slab, m, *bitmap;
     ngx_uint_t n, type, slot, shift, map;
     ngx_slab_page_t *slots, *page;
-
-    LOG_INFO("slab free: %p", p);
 
     if ((u_char *)p < pool->start || (u_char *)p > pool->end)
     {
@@ -553,21 +463,19 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
         size = 1 << shift; // 计算块obj的大小
 
         if ((uintptr_t)p & (size - 1))
-        { // 由于对齐,p的地址一定是obj大小的整数倍
+        {
             goto wrong_chunk;
         }
 
         n = ((uintptr_t)p & (ngx_pagesize - 1)) >> shift;      // 求出p对应的obj块的位置
         m = (uintptr_t)1 << (n & (sizeof(uintptr_t) * 8 - 1)); ////求出在uintptr_t中,p的偏移,即求出在uintptr_t中的第几位
-        // 由于map是根据uintptr_t划分的,所以求出该块对应的uintptr_t的偏移,即求出第几个uintptr_t
         n /= (sizeof(uintptr_t) * 8);                                          // 该obj所在的是那个bitmap，例如一个页64个obj，则需要2个bitmap表示这64个obj的位图
         bitmap = (uintptr_t *)((uintptr_t)p & ~((uintptr_t)ngx_pagesize - 1)); // 求出p对应的page页所在位图的位置
 
         if (bitmap[n] & m)
-        { // 如果第m位确实为1,
-
+        {
             if (page->next == NULL)
-            {                                                                          // 如果页面的当前状态是全部已使用,就把他链入slot_m[]中
+            {   // 如果页面的当前状态是全部已使用,就把他链入slot_m[]中
                 slots = (ngx_slab_page_t *)((u_char *)pool + sizeof(ngx_slab_pool_t)); // 定位slot_m数组
 
                 // 找到对应的slot_m[]的元素
@@ -586,11 +494,10 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
             bitmap[n] &= ~m;
 
             // 下面的操作主要是查看这个页面是否都没用, 如果都没使用,则将页面归入free中
-
             n = (1 << (ngx_pagesize_shift - shift)) / 8 / (1 << shift);
 
             if (n == 0)
-            { // 计算需要多少个4字节bitmap来存储位图，例如64个obj需要2个bitmap来表示64位,需要多少个obj来存储这两个bitmap，一般第一个obj够存储两个bitmap，也就是用64字节中的8字节
+            {
                 n = 1;
             }
 
@@ -604,7 +511,7 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
             map = (1 << (ngx_pagesize_shift - shift)) / (sizeof(uintptr_t) * 8);
 
             for (n = 1; n < map; n++)
-            { // 查看其他uintptr_t是否都没使用
+            {
                 if (bitmap[n])
                 {
                     goto done;
@@ -619,20 +526,18 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
         goto chunk_already_free;
 
     case NGX_SLAB_EXACT:
-        // p所对应的在slab(obj位图)中的位置.
         m = (uintptr_t)1 << (((uintptr_t)p & (ngx_pagesize - 1)) >> ngx_slab_exact_shift);
         size = ngx_slab_exact_size;
 
         if ((uintptr_t)p & (size - 1))
-        { // 如果p为page中的obj块,那么一定是size整数倍
+        {
             goto wrong_chunk;
         }
 
         if (slab & m)
-        { // slab(位图)中对应的位为1
+        {
             if (slab == NGX_SLAB_BUSY)
-            { // 如果整个页面中的所有obj块都被使用,则该页page[]和slot[]没有对应关系,因此需要把页page[]和slot[]对应关系加上
-                // 定位slot[]数组
+            {
                 slots = (ngx_slab_page_t *)((u_char *)pool + sizeof(ngx_slab_pool_t));
                 slot = ngx_slab_exact_shift - pool->min_shift; // 计算该页面要链入slot[]的哪个槽中
 
@@ -647,7 +552,7 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
             page->slab &= ~m; // 将slab块对应位置设置为0
 
             if (page->slab)
-            { // page页面中还有正在使用的obj块,因为slab位图不为0
+            {
                 goto done;
             }
 
@@ -658,8 +563,7 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
 
         goto chunk_already_free;
 
-    case NGX_SLAB_BIG: // 用户请求内存的大小大于ngx_slab_exact_size
-        // slab的高16位是slot块的位图,低16位用于存储slot块大小的偏移
+    case NGX_SLAB_BIG:
 
         shift = slab & NGX_SLAB_SHIFT_MASK;
         size = 1 << shift;
@@ -731,8 +635,6 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
 
         ngx_slab_free_pages(pool, &pool->pages[n], size); // 归还页面
 
-        ngx_slab_junk(p, size << ngx_pagesize_shift);
-
         return;
     }
 
@@ -741,8 +643,6 @@ void ngx_slab_free_unlocked(ngx_slab_pool_t *pool, void *p)
     return;
 
 done:
-
-    ngx_slab_junk(p, size);
 
     return;
 
@@ -865,14 +765,14 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
     join = page + page->slab;
 
     if (join < pool->last)
-    { // join不是pool中最后一个page
+    {
         type = join->prev & NGX_SLAB_PAGE_MASK;
 
         if (type == NGX_SLAB_PAGE)
-        { // 和ngx_slab_alloc_pages配合阅读，
+        { 
 
             if (join->next != NULL)
-            { // 该if应该始终满足不了???/  在alloc的时候首页page的next是指向NULL
+            {
                 pages += join->slab;
                 page->slab += join->slab;
 

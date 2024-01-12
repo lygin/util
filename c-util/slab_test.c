@@ -3,7 +3,7 @@
 
 int main() {
   ngx_shm_t shm;
-  shm.size = 1 << 20; // 4M
+  shm.size = 1 << 20; // 1M
   if (ngx_shm_alloc(&shm) == -1) {
     LOG_INFO("SHM ERROR");
     return 0;
@@ -15,10 +15,9 @@ int main() {
   pool->addr = shm.addr;
 
   ngx_slab_init(pool);
-  LOG_INFO("%d", sizeof(int));
-  int *p = ngx_slab_alloc_unlocked(pool, sizeof(int));
+  int *p = ngx_slab_alloc(pool, sizeof(int));
   *p = 9;
   LOG_INFO("%d", *p);
-  ngx_slab_free_unlocked(pool, p);
+  ngx_slab_free(pool, p);
   return 0;
 }

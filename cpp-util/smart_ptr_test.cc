@@ -12,8 +12,8 @@ struct MyStruct
 };
 
 void func(smart_ptr<MyStruct> xx) {
-    //xx(sp) 拷贝构造+1
-    //析构xx -1
+    //xx(sp) 拷贝构造+1 2
+    //析构xx -1 1
 }
 int main()
 {
@@ -21,12 +21,12 @@ int main()
 	s->a = 10;
 	s->b = 20;
 
-	smart_ptr<MyStruct> sp(s);
+	smart_ptr<MyStruct> sp(s);//1
     func(sp);
     {   
-        auto xxx = sp;//这个时候的拷贝赋值是初始化，等价于拷贝构造，即xxx(sp),+1
+        auto xxx = sp;//这个时候的拷贝赋值是初始化，等价于拷贝构造，即xxx(sp),+1 2
         xxx = sp;//拷贝赋值 
-        //xxx 析构-1
+        //xxx 析构-1 1
     }
 
 	cout << sp->a << endl;
